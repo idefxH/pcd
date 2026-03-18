@@ -1,0 +1,10 @@
+spec-lint (0.3.2-1) unstable; urgency=medium
+
+  * Initial release of spec-lint
+  * Implements Post-Coding Development Paradigm specification validation
+  * Supports structural validation of specification files
+  * Validates metadata fields including SPDX license identifiers
+  * Checks deployment template compliance
+  * Provides list-templates command for template discovery
+
+ -- Matthias G. Eckermann <post-coding-development-paradigm@mailbox.org>  Thu, 01 Jan 2024 12:00:00 +0000

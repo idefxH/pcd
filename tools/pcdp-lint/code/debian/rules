@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+
+export CGO_ENABLED=0
+export GOOS=linux
+export GOARCH=amd64
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	go build -a -ldflags '-extldflags "-static" -X main.TemplateDir=/usr/share/post-coding/templates/' -o spec-lint .
+
+override_dh_auto_install:
+	dh_auto_install
+	mkdir -p debian/spec-lint/usr/bin
+	install -m 755 spec-lint debian/spec-lint/usr/bin/spec-lint
+	mkdir -p debian/spec-lint/usr/share/post-coding/templates
+
+override_dh_auto_test:
+	# Skip tests for now
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -f spec-lint
