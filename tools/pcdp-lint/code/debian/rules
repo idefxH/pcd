@@ -8,17 +8,17 @@ export GOARCH=amd64
 	dh $@
 
 override_dh_auto_build:
-	go build -a -ldflags '-extldflags "-static" -X main.TemplateDir=/usr/share/post-coding/templates/' -o spec-lint .
+	go build -a -ldflags '-extldflags "-static" -X main.TemplateDir=/usr/share/post-coding/templates/' -o pcdp-lint .
 
 override_dh_auto_install:
 	dh_auto_install
-	mkdir -p debian/spec-lint/usr/bin
-	install -m 755 spec-lint debian/spec-lint/usr/bin/spec-lint
-	mkdir -p debian/spec-lint/usr/share/post-coding/templates
+	mkdir -p debian/pcdp-lint/usr/bin
+	install -m 755 pcdp-lint debian/pcdp-lint/usr/bin/pcdp-lint
+	mkdir -p debian/pcdp-lint/usr/share/post-coding/templates
 
 override_dh_auto_test:
 	# Skip tests for now
 
 override_dh_auto_clean:
 	dh_auto_clean
-	rm -f spec-lint
+	rm -f pcdp-lint

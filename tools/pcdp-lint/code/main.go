@@ -83,8 +83,8 @@ func main() {
 	
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "error: missing file argument\n")
-		fmt.Fprintf(os.Stderr, "Usage: spec-lint [strict=true] <specfile.md>\n")
-		fmt.Fprintf(os.Stderr, "       spec-lint list-templates\n")
+		fmt.Fprintf(os.Stderr, "Usage: pcdp-lint [strict=true] <specfile.md>\n")
+		fmt.Fprintf(os.Stderr, "       pcdp-lint list-templates\n")
 		os.Exit(ExitInvocation)
 	}
 
@@ -124,8 +124,8 @@ func main() {
 
 	if filename == "" {
 		fmt.Fprintf(os.Stderr, "error: missing file argument\n")
-		fmt.Fprintf(os.Stderr, "Usage: spec-lint [strict=true] <specfile.md>\n")
-		fmt.Fprintf(os.Stderr, "       spec-lint list-templates\n")
+		fmt.Fprintf(os.Stderr, "Usage: pcdp-lint [strict=true] <specfile.md>\n")
+		fmt.Fprintf(os.Stderr, "       pcdp-lint list-templates\n")
 		os.Exit(ExitInvocation)
 	}
 
@@ -423,7 +423,7 @@ func validateMetaFields(metaFields []MetaField, result *LintResult) {
 			result.Diagnostics = append(result.Diagnostics, Diagnostic{
 				Severity: SeverityError,
 				Section:  "META",
-				Message:  fmt.Sprintf("Unknown deployment template: '%s'. Run 'spec-lint list-templates' to see valid values.", deployment.Value),
+				Message:  fmt.Sprintf("Unknown deployment template: '%s'. Run 'pcdp-lint list-templates' to see valid values.", deployment.Value),
 				Line:     deployment.Line,
 			})
 		}

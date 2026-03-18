@@ -1,6 +1,6 @@
 .PHONY: build clean test install
 
-BINARY_NAME=spec-lint
+BINARY_NAME=pcdp-lint
 TEMPLATE_DIR=/usr/share/post-coding/templates/
 
 build:
@@ -18,7 +18,7 @@ install: build
 	mkdir -p $(DESTDIR)/usr/share/post-coding/templates
 
 rpm: build
-	rpmbuild -ba spec-lint.spec
+	rpmbuild -ba pcdp-lint.spec
 
 deb: 
 	debuild -us -uc

@@ -1,4 +1,4 @@
-# spec-lint
+# pcdp-lint
 
 A command-line tool for validating specification files written in the Post-Coding Development Paradigm format.
 
@@ -19,13 +19,13 @@ The tool is available as RPM and DEB packages via the OpenSUSE Build Service (OB
 
 ```bash
 # For openSUSE/SLES
-zypper install spec-lint
+zypper install pcdp-lint
 
 # For Debian/Ubuntu  
-apt install spec-lint
+apt install pcdp-lint
 
 # For Fedora
-dnf install spec-lint
+dnf install pcdp-lint
 ```
 
 ### From Source
@@ -40,19 +40,19 @@ sudo make install
 ### Lint a specification file
 
 ```bash
-spec-lint myspec.md
+pcdp-lint myspec.md
 ```
 
 ### Strict mode (treat warnings as errors)
 
 ```bash
-spec-lint strict=true myspec.md
+pcdp-lint strict=true myspec.md
 ```
 
 ### List available deployment templates
 
 ```bash
-spec-lint list-templates
+pcdp-lint list-templates
 ```
 
 ## Output

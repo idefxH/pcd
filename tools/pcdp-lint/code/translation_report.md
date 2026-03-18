@@ -1,8 +1,8 @@
-# Translation Report: spec-lint
+# Translation Report: pcdp-lint
 
 ## Implementation Summary
 
-This report covers the implementation of the `spec-lint` tool according to the Post-Coding Development Paradigm specification version 0.3.2.
+This report covers the implementation of the `pcdp-lint` tool according to the Post-Coding Development Paradigm specification version 0.3.2.
 
 ## Deployment Template Resolution
 
@@ -21,7 +21,7 @@ This report covers the implementation of the `spec-lint` tool according to the P
 According to the cli-tool template DELIVERABLES section, the following files were created:
 
 ### Required (RPM - constraint: required)
-- `spec-lint.spec` - RPM package specification file
+- `pcdp-lint.spec` - RPM package specification file
 
 ### Required (DEB - constraint: required)  
 - `debian/control` - Debian package control file

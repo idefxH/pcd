@@ -1,17 +1,17 @@
-Source: spec-lint
+Source: pcdp-lint
 Section: devel
 Priority: optional
 Maintainer: Matthias G. Eckermann <post-coding-development-paradigm@mailbox.org>
 Build-Depends: debhelper-compat (= 13), golang-go (>= 2:1.19~)
 Standards-Version: 4.6.0
-Homepage: https://github.com/post-coding/spec-lint
+Homepage: https://github.com/post-coding/pcdp-lint
 Rules-Requires-Root: no
 
-Package: spec-lint
+Package: pcdp-lint
 Architecture: amd64
 Depends: ${misc:Depends}
 Description: Post-Coding Development Paradigm specification linter
- spec-lint is a command-line tool for validating specification files written
+ pcdp-lint is a command-line tool for validating specification files written
  in the Post-Coding Development Paradigm format. It checks structural rules,
  validates metadata fields, and ensures compliance with deployment templates.
  .

@@ -1,3 +1,3 @@
-module spec-lint
+module pcdp-lint
 
 go 1.19

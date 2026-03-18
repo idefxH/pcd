@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: spec-lint
+Upstream-Name: pcdp-lint
 Upstream-Contact: Matthias G. Eckermann <post-coding-development-paradigm@mailbox.org>
-Source: https://github.com/post-coding/spec-lint
+Source: https://github.com/post-coding/pcdp-lint
 
 Files: *
 Copyright: 2024 Matthias G. Eckermann <post-coding-development-paradigm@mailbox.org>

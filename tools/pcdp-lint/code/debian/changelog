@@ -1,6 +1,6 @@
-spec-lint (0.3.2-1) unstable; urgency=medium
+pcdp-lint (0.3.2-1) unstable; urgency=medium
 
-  * Initial release of spec-lint
+  * Initial release of pcdp-lint
   * Implements Post-Coding Development Paradigm specification validation
   * Supports structural validation of specification files
   * Validates metadata fields including SPDX license identifiers
