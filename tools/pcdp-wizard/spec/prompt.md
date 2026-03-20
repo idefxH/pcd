@@ -4,7 +4,7 @@ I am providing two files:
    the conventions, constraints, and defaults for this type of component
    under the Post-Coding Development Paradigm.
 
-2. pcdp-lint.md — a specification for a component, written in the
+2. pcdp-wizard.md — a specification for a component, written in the
    Post-Coding Development Paradigm format.
 
 Your task:
