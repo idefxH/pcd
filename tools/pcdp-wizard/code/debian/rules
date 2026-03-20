@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+
+export CGO_ENABLED=0
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	go build -ldflags="-s -w" -o pcdp-wizard .
+
+override_dh_auto_install:
+	install -D -m 755 pcdp-wizard debian/pcdp-wizard/usr/bin/pcdp-wizard

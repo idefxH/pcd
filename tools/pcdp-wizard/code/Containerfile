@@ -1,0 +1,35 @@
+# Multi-stage build for pcdp-wizard OCI container
+
+# Builder stage
+FROM docker.io/library/golang:1.19-alpine AS builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apk add --no-cache git
+
+# Copy go mod files first for better caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build static binary
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o pcdp-wizard .
+
+# Final stage - minimal container
+FROM scratch
+
+# Copy the binary from builder stage
+COPY --from=builder /build/pcdp-wizard /usr/bin/pcdp-wizard
+
+# Copy license and documentation
+COPY --from=builder /build/LICENSE /LICENSE
+COPY --from=builder /build/README.md /README.md
+
+# Set working directory
+WORKDIR /workspace
+
+# Default command
+ENTRYPOINT ["/usr/bin/pcdp-wizard"]

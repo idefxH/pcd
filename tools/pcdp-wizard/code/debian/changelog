@@ -1,0 +1,8 @@
+pcdp-wizard (0.3.7-1) unstable; urgency=medium
+
+  * Initial release
+  * Interactive wizard for PCDP specification creation
+  * Session management with resume capability
+  * Automatic validation integration
+
+ -- Matthias G. Eckermann <pcdp@mailbox.org>  Mon, 15 Jan 2024 12:00:00 +0000

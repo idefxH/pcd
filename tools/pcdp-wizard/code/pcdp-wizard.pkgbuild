@@ -1,0 +1,37 @@
+# pcdp-wizard.pkgbuild - macOS installer package descriptor
+
+PACKAGE_NAME="pcdp-wizard"
+PACKAGE_VERSION="0.3.7"
+PACKAGE_IDENTIFIER="org.pcdp.wizard"
+INSTALL_LOCATION="/usr/local/bin"
+
+# Build configuration
+BUILD_ROOT="./build-root"
+BINARY_NAME="pcdp-wizard"
+
+# Package metadata
+TITLE="PCDP Wizard"
+DESCRIPTION="Interactive wizard for creating PCDP specifications"
+LICENSE="GPL-2.0-only"
+VENDOR="PCDP Project"
+
+# Build instructions for macOS package
+# This is a minimal skeleton as documented in the template
+
+build_package() {
+    # Create build root
+    mkdir -p "${BUILD_ROOT}${INSTALL_LOCATION}"
+    
+    # Build for macOS
+    GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o "${BUILD_ROOT}${INSTALL_LOCATION}/${BINARY_NAME}" .
+    
+    # Create package
+    pkgbuild --root "${BUILD_ROOT}" \
+             --identifier "${PACKAGE_IDENTIFIER}" \
+             --version "${PACKAGE_VERSION}" \
+             --install-location "/" \
+             "${PACKAGE_NAME}-${PACKAGE_VERSION}.pkg"
+}
+
+# Note: This is a minimal skeleton for macOS packaging.
+# Full implementation would require additional macOS-specific tooling and signing.
