@@ -2,9 +2,9 @@
 ## Human Intent, Machine Implementation
 
 **Status:** Draft  
-**Version:** 0.3.7  
+**Version:** 0.3.8  
 **Author:** Matthias G. Eckermann <pcdp@mailbox.org>  
-**Date:** 2026-03-17
+**Date:** 2026-03-19
 
 ---
 
@@ -1378,6 +1378,8 @@ This keeps specifications clean and stable. A spec written today remains valid i
 | `academic` | Fortran | C, Julia | Math/Physics/HPC context | |
 | `enhance-existing` | *Must declare* | *Must declare* | Must match existing codebase | See below |
 | `manual` | *Must declare all* | — | No template assistance | Fully explicit fallback |
+| `project-manifest` | N/A | — | Multi-component project definition | Architect artifact. No code generated; produces project audit bundle. v0.3.9 target. |
+| `mcp-server` | Go | Rust | MCP protocol (stdio / HTTP+SSE), tool registration, error conventions | For MCP server components. v0.3.9 target. |
 
 **GUI tool platform slots:**
 
@@ -1920,26 +1922,252 @@ freedom — GPL-compatible code may be used freely.
 
 ---
 
-*End of Document*
+---
 
-**Status:** Draft
-**Version:** 0.3.7
-**Author:** Matthias G. Eckermann <pcdp@mailbox.org>
-**Date:** 2026-03-18
+## A.16 Large Projects — Partitioning, Interfaces, and Composition
+
+### The Problem
+
+Everything in PCDP v0.3.x assumes a single component with a single specification
+file. Real software systems are composed of many components with defined interfaces
+between them. A payment system is not one spec — it is an account service, a
+transfer service, a ledger, an audit log, and a notification system, each with
+precisely defined contracts between them.
+
+The paradigm must scale to this reality. The architect role in PCDP is to
+decompose a system into components, define the interfaces between them, and
+specify the build order. Individual domain experts then author the per-component
+specifications.
+
+### Core Concepts
+
+**Component Interface**
+A spec may declare that it exposes a public interface — a set of types,
+function signatures, and invariants that other components may depend on.
+The interface is a subset of the spec's TYPES and BEHAVIOR sections,
+explicitly marked as exported.
+
+Interface declaration in a spec:
+
+```markdown
+## INTERFACE
+EXPORTS:
+  TYPES:
+    - Account
+    - TransferResult
+    - ErrorCode
+  BEHAVIOR:
+    - transfer
+  INVARIANTS:
+    - GLOBAL: ∀ a: Account. a.balance >= 0
+```
+
+**Spec Import**
+A spec may declare that it depends on another component's interface.
+Imports are resolved at translation time — the translator receives both
+the spec and all imported interface definitions.
+
+Import declaration in a spec META:
+
+```markdown
+Imports:
+  - account-service: ./account-service.md#INTERFACE
+  - audit-log: ./audit-log.md#INTERFACE
+```
+
+The `#INTERFACE` fragment means "import only the exported interface,
+not the full implementation spec."
+
+**Project Manifest**
+A top-level file (`pcdp-project.md`) that declares all components in a
+system, their dependencies, build order, and system-level invariants.
+The manifest is the architect's primary artifact in a multi-component project.
+See Appendix A.17 for the `project-manifest` deployment template.
+
+**System-Level Invariants**
+Invariants that span multiple components belong in the project manifest,
+not in individual component specs:
+
+```markdown
+## SYSTEM-INVARIANTS
+- GLOBAL: Σ(all account balances) is conserved across all services
+- GLOBAL: every transfer_id is globally unique across all instances
+- GLOBAL: audit log entry exists for every state-changing operation
+```
+
+### Architectural Workflow for Large Projects
+
+```
+1. Architect authors pcdp-project.md
+   Declares: components, dependencies, build order, system invariants
+
+2. Architect authors interface specs (*.interface.md)
+   Declares: exported types, function signatures, invariants
+   Frozen before implementation specs are written
+
+3. Domain experts author component specs (*.md)
+   Each spec imports the interfaces it depends on
+   Implementation specified against the imported interface contract
+
+4. AI translates each component spec independently
+   Import resolution provides full type information at translation time
+   Generated code respects interface contracts by construction
+
+5. pcdp-lint validates the full project
+   Checks: all imports resolve, interface contracts consistent,
+   no circular dependencies, system invariants present
+```
+
+### Divide and Conquer
+
+The decomposition principle: **a component spec should be translatable
+independently of all other components.** This means:
+
+- Interfaces must be fully specified before implementation specs are written
+- A component spec that imports an interface gets all type information
+  it needs from that import — no implicit knowledge of other components
+- The translator generating component A does not need to know anything
+  about component B beyond B's exported interface
+
+This mirrors the classical principle of programming to interfaces, not
+implementations — applied at the specification level.
+
+### Component Granularity
+
+A useful heuristic for decomposition: **a component spec should fit
+comfortably in a single LLM context window.** If a spec requires scrolling
+past thousands of lines to understand, it should be split.
+
+Practical guidance:
+- A component handles one coherent domain concept (accounts, transfers, sessions)
+- A component exposes a small, stable interface (3-10 functions)
+- A component has at most 20-30 EXAMPLES
+- If a spec has more than 5 BEHAVIOR sections, consider splitting
+
+### Interface Versioning
+
+Interfaces are versioned independently of their implementing components.
+An interface version change that breaks existing importers is a major version
+bump. Backwards-compatible additions are minor version bumps.
+
+```markdown
+## META
+Deployment:  backend-service
+Interface-Version: 1.2.0    ← version of the exported interface
+Version:     2.4.1          ← version of this implementation spec
+...
+```
+
+Importers declare the minimum interface version they require:
+
+```markdown
+Imports:
+  - account-service: ./account-service.md#INTERFACE@>=1.2.0
+```
+
+### What This Means for pcdp-lint
+
+`pcdp-lint` v1 validates single specs in isolation. A future version
+(v2 scope) will validate full projects:
+
+- Resolve all imports and check they exist
+- Verify imported interface versions satisfy declared requirements
+- Check for circular dependencies
+- Validate system invariants reference only exported types and behaviors
+- Produce a project-level audit bundle covering all components
 
 ---
+
+## A.17 The mcp-server-pcdp: MCP Server for PCDP
+
+### Motivation
+
+The filesystem-based template system (TEMPLATE_DIR, systemd-style preset
+layering) works well for single-developer use. For teams and enterprises,
+a network-accessible MCP server is more practical:
+
+- Templates and presets managed centrally, not per-machine
+- Org-specific template customisations deployed without touching developer machines
+- Any MCP-capable host (mcphost, VS Code, Claude Desktop, web UI) can
+  access templates and validation without filesystem configuration
+- Versioned template registry: `cli-tool@0.3.8` and `cli-tool@latest` simultaneously
+- Access control: teams can have private templates not in the public registry
+
+### Architecture
+
+`mcp-server-pcdp` is a single MCP server exposing three tool groups:
+
+```
+mcp-server-pcdp
+├── template/*
+│   ├── list          list available templates with versions
+│   ├── get           retrieve a template by name and version
+│   └── resolve       resolve effective settings after preset layering
+│
+├── lint/*
+│   ├── validate      run pcdp-lint rules against a spec, return diagnostics
+│   └── check-project validate a full project manifest and all imports
+│
+└── project/*
+    ├── get-interface  retrieve exported interface from a spec
+    └── resolve-imports resolve all imports for a spec
+```
+
+### The LLM as Wizard
+
+The spec-authoring guidance (what was previously conceived as `pcdp-wizard`)
+is not a server responsibility — it is the LLM's role. An LLM connected to
+`mcp-server-pcdp` via any MCP-capable host can:
+
+1. Call `template/list` to show available deployment templates
+2. Call `template/get` to retrieve the selected template
+3. Ask the user the right questions based on the template's required fields
+4. Call `lint/validate` to check the spec as it is being written
+5. Iterate until lint passes
+
+No wizard tool needed. The MCP server provides the data and validation layer;
+the LLM provides the conversational layer. This works in mcphost, VS Code
+with Copilot, Claude Desktop, or any other MCP-capable environment without
+any changes to the server.
+
+### Preset Layering via MCP
+
+The server implements the same systemd-style layering as the filesystem
+approach, but resolved server-side:
+
+```
+vendor defaults      built into server binary
+org presets          /etc/mcp-server-pcdp/presets/
+team presets         per-request context header
+user presets         per-request context header
+```
+
+A client requesting `template/resolve` passes its context (org, team, user)
+and receives the fully-merged effective settings — no client-side merging needed.
+
+### Implementation
+
+`mcp-server-pcdp` is specified using PCDP (`mcp-server-pcdp.md`) with
+`Deployment: mcp-server`. Default implementation language: Go.
+It is generated from that spec. Self-hosting applies.
+
+The `mcp-server` deployment template (to be written in v0.3.9) defines
+the full constraint set for MCP server components: transport (stdio / HTTP+SSE),
+tool registration format, error response conventions, and packaging.
 
 ## Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.3.7 | 2026-03-18 | Anonymized all LLM/vendor names in A.14 (labels LLM-A through LLM-F replacing commercial model names). Removed version numbers from all internal filename references (git tags handle versioning). Updated A.14 title and test configuration references. v0.3.8: atomic delivery sentinel, compilation gate, SCA CI step, pcdp-lint self-validation fixes, write verified-library/library-c-abi/python-tool template files. |
-| 0.3.6 | 2026-03-18 | Renamed crypto-library to verified-library (broader scope: all safety/security-critical C-ABI libraries). Added python-tool template (QM only, no formal verification). Added library-c-abi CPS deliverable note (CMake 4.3). Added pcdp-lint deprecation warning for crypto-library and constraint validation rules for python-tool and verified-library. Updated META format reference. |
-| 0.3.5 | 2026-03-18 | Renamed tool from spec-lint to pcdp-lint. Renamed project short name to pcdp throughout paths, package names, and filenames. New filename convention: {name}-{MAJOR}.{MINOR}.{PATCH}.md (hyphens, dots). Replaced all angle-bracket placeholders with curly braces. Added version bare-word command. Fixed DeploymentTemplate type definition gap. v0.3.6 change list: atomic delivery sentinel, compilation gate, SCA CI step, fix spec self-validation errors. |
-| 0.3.4 | 2026-03-18 | Differentiated licensing: CC-BY-4.0 for specs and templates, GPL-2.0-only for pcdp-lint reference implementation. Added A.15: License Compliance and SCA. Updated A.5 Governance with full license rationale. |
-| 0.3.3 | 2026-03-17 | Updated A.13: refined prompt with system/user split, concrete filename guidance, planning step, filesystem verification. Expanded A.14: full empirical test results across 7+ runs, prompt evolution table, infrastructure lessons. Added translation_report/ to audit bundle structure in A.2. Updated cli-tool.template: expanded DELIVERABLES with source/build/docs/license/report rows, delivery order, Go filename convention. Updated pcdp-lint: parsing approach note, signal handling note. |
-| 0.3.2 | 2026-03-17 | Added A.13: Recommended Translator Prompt. Added A.14: First Empirical Test results. Added Template Search Path subsection to A.11. Applied six pcdp-lint fixes from empirical test. Added DELIVERABLES section to cli-tool.template. Unified versioning across all artifacts. |
-| 0.3.1 | 2026-03-17 | Moved Changelog to end of document. Added A.12: Related Work and Industry Landscape. Updated META field set (Version, Spec-Schema, Author, License now required). Noted BEHAVIOR/INTERNAL as recognised section variant. |
-| 0.3.0 | 2026-03-17 | Added A.11: Deployment Templates and Target Language Resolution. Introduced systemd-style preset layering, initial deployment template set, pcdp-lint as reference implementation. |
-| 0.2.3 | 2026-02-10 | Workflow diagram finalized. Dual-path architecture (direct/verified) stabilized. |
+| 0.3.8 | 2026-03-19 | Added A.16: Large Projects — Partitioning, Interfaces, and Composition. Added A.17: mcp-server-pcdp MCP architecture. Dropped pcdp-wizard as standalone CLI — wizard behaviour is the LLM's role; mcp-server-pcdp provides the data layer. Added project-manifest and mcp-server to deployment template roadmap. |
+| 0.3.7 | 2026-03-18 | Anonymized all LLM/vendor names in A.14. Removed version numbers from all internal filename references. |
+| 0.3.6 | 2026-03-18 | crypto-library → verified-library. python-tool added. library-c-abi CPS note (CMake 4.3). |
+| 0.3.5 | 2026-03-18 | Renamed spec-lint → pcdp-lint. post-coding paths → pcdp. Filename convention. Curly brace placeholders. |
+| 0.3.4 | 2026-03-18 | CC-BY-4.0 for specs/templates, GPL-2.0-only for tools. A.15 SCA. |
+| 0.3.3 | 2026-03-17 | Expanded A.13/A.14. translation_report/ in audit bundle. DELIVERABLES expanded. |
+| 0.3.2 | 2026-03-17 | A.13 prompt. A.14 empirical tests. DELIVERABLES in template. Unified versioning. |
+| 0.3.1 | 2026-03-17 | Changelog moved to end. A.12 industry landscape. BEHAVIOR/INTERNAL. |
+| 0.3.0 | 2026-03-17 | Deployment template system. Target: removed from META. |
+| 0.2.3 | 2026-02-10 | Workflow diagram. Dual-path architecture. |
 | 0.2.1 | 2026-02-10 | Initial public draft. |
+
