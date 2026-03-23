@@ -147,7 +147,7 @@ pcdp/
 │       └── account-transfer.md        ← worked example from whitepaper
 │
 └── prompts/
-│   ├── README-small-models.md         ← Optimization for smaller LLMs
+    ├── README-small-models.md         ← Optimization for smaller LLMs
     └── prompt.md                      ← standard translator prompt (A.13)
 ```
 
@@ -279,7 +279,7 @@ The CC-BY-4.0 license on specifications and templates means anyone may implement
 
 ## Status
 
-Current version: **0.3.7** (draft)
+Current version: **0.3.9** (draft)
 
 This project is in active development. The specification format, deployment templates, and tooling are stabilising toward a v1.0 release. Feedback, issue reports, and contributions are welcome.
 
