@@ -47,7 +47,8 @@ DeploymentTemplate := one_of(
   "wasm" | "ebpf" | "kernel-module" | "verified-library" |
   "cli-tool" | "gui-tool" | "cloud-native" | "backend-service" |
   "library-c-abi" | "enterprise-software" | "academic" |
-  "python-tool" | "enhance-existing" | "manual" | "template"
+  "python-tool" | "enhance-existing" | "manual" | "template" |
+  "mcp-server"
 )
 // "crypto-library" is retired as of 0.3.6. Use "verified-library" instead.
 // "verified-library" covers all safety- and security-critical C-ABI libraries.
@@ -146,7 +147,7 @@ PRECONDITIONS:
 
 POSTCONDITIONS:
 - exit_code = 0 always
-- stdout contains exactly 15 lines, one per known DeploymentTemplate value
+- stdout contains exactly 16 lines, one per known DeploymentTemplate value
 - each line format: "<template-name>  →  <default-language>"
 - for enhance-existing: "<template-name>  →  (declare Language: in META)"
 - for manual:           "<template-name>  →  (declare Target: in META)"

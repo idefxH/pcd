@@ -1,0 +1,405 @@
+# mcp-server.template
+
+## META
+Deployment:  template
+Version:     0.3.8
+Spec-Schema: 0.3.8
+Author:      Matthias G. Eckermann <pcdp@mailbox.org>
+License:     CC-BY-4.0
+Verification: none
+Safety-Level: QM
+Template-For: mcp-server
+
+---
+
+## TYPES
+
+```
+Language := Go | Python | Rust
+// Go is the default. Python and Rust are supported alternatives.
+// No other languages permitted for MCP servers in v1.
+
+GoFramework := mcp-go | go-sdk
+// mcp-go:  github.com/mark3labs/mcp-go
+//          Community SDK. Supports stdio, Streamable HTTP, SSE, in-process.
+//          Default choice: covers all required transports.
+// go-sdk:  github.com/modelcontextprotocol/go-sdk
+//          Official SDK, maintained with Google. Supports stdio and command
+//          transports. HTTP transport support in progress.
+//          Choose when: spec compliance priority or official SDK required.
+// The framework is selected via preset; not declared in the spec itself.
+
+Transport := stdio | streamable-http
+// Both transports are required for all mcp-server components.
+// stdio:           Used by mcphost, Claude Desktop, VS Code, and similar
+//                  CLI-based MCP hosts. The server reads from stdin and
+//                  writes to stdout. Launched as a subprocess by the host.
+// streamable-http: Used by web-based MCP hosts, remote access, and
+//                  multi-client scenarios. HTTP POST for requests,
+//                  Server-Sent Events (SSE) for streaming responses.
+//                  Endpoint: /mcp (default), configurable via listen=
+
+MCPCapability := tools | resources | prompts | sampling
+// tools:     Functions the LLM can call. Primary capability for most servers.
+// resources: Read-only data sources the LLM can access (files, DB records).
+// prompts:   Reusable prompt templates the LLM can request.
+// sampling:  Server-initiated LLM sampling (advanced, rarely needed).
+
+ToolName := string where matches "^[a-z][a-z0-9_-]*$"
+// Snake_case or hyphen-separated. No spaces. No uppercase.
+// Must be unique within the server.
+
+ErrorCode := integer
+// MCP error codes follow JSON-RPC 2.0 conventions:
+// -32700: Parse error
+// -32600: Invalid request
+// -32601: Method not found
+// -32602: Invalid params
+// -32603: Internal error
+// Application-specific errors: -32000 to -32099
+
+ListenAddress := string
+// Default: 127.0.0.1:8080 for streamable-http transport
+// Override via listen= key=value argument
+```
+
+---
+
+## TEMPLATE-TABLE
+
+| Key | Value | Constraint | Notes |
+|-----|-------|------------|-------|
+| VERSION | MAJOR.MINOR.PATCH | required | |
+| SPEC-SCHEMA | MAJOR.MINOR.PATCH | required | |
+| AUTHOR | name <email> | required | Repeating field. |
+| LICENSE | SPDX identifier | required | |
+| LANGUAGE | Go | default | Primary language for MCP servers. |
+| LANGUAGE-ALTERNATIVES | Python | supported | Via preset override. Use official MCP Python SDK. |
+| LANGUAGE-ALTERNATIVES | Rust | supported | Via preset override. Use official MCP Rust SDK. |
+| GO-FRAMEWORK | mcp-go | default | github.com/mark3labs/mcp-go. Covers both required transports. |
+| GO-FRAMEWORK-ALTERNATIVE | go-sdk | supported | github.com/modelcontextprotocol/go-sdk. HTTP transport in progress; choose for spec compliance. |
+| TRANSPORT | stdio | required | Always implement. Primary transport for CLI-based hosts. |
+| TRANSPORT | streamable-http | required | Always implement. Required for web and remote access. |
+| BINARY-TYPE | static | required | Single static binary. No runtime dependencies. CGO_ENABLED=0 for Go. |
+| BINARY-COUNT | 1 | required | One binary serves both transports, selected by invocation mode. |
+| CLI-ARG-STYLE | key=value | required | Consistent with pcdp conventions. |
+| TRANSPORT-SELECTION | bare-word | required | Transport selected by bare word: `mcp-server-{n} stdio` or `mcp-server-{n} http` |
+| LISTEN-DEFAULT | 127.0.0.1:8080 | default | Default bind address for streamable-http. Override: listen=host:port |
+| MCP-CAPABILITY | tools | required | All MCP servers must implement at least tools capability. |
+| MCP-CAPABILITY | resources | supported | Optional. Declare in spec BEHAVIOR sections if used. |
+| MCP-CAPABILITY | prompts | supported | Optional. Declare in spec BEHAVIOR sections if used. |
+| NETWORK-CALLS | context-dependent | supported | MCP servers exist to provide data — network calls are permitted and expected. Declare external dependencies in DEPLOYMENT section. |
+| CONFIG-ENV-VARS | forbidden | forbidden | Configuration via key=value arguments or preset files only. Not environment variables. |
+| ERROR-HANDLING | JSON-RPC 2.0 | required | All errors must be returned as JSON-RPC error responses, not panics. |
+| SIGNAL-HANDLING | SIGTERM | required | Clean shutdown: drain in-flight requests, close connections, exit 0. |
+| SIGNAL-HANDLING | SIGINT | required | Same as SIGTERM. |
+| IDEMPOTENT-TOOLS | recommended | supported | Tools should be idempotent where possible. Document side effects in tool descriptions. |
+| OUTPUT-FORMAT | RPM | required | OBS RPM package. |
+| OUTPUT-FORMAT | DEB | required | OBS DEB package. |
+| OUTPUT-FORMAT | OCI | required | Containerfile for OCI image. MCP servers are commonly deployed as containers. |
+| OUTPUT-FORMAT | binary | supported | Raw binary for direct installation. |
+| INSTALL-METHOD | OBS | required | Primary distribution via OBS. |
+| INSTALL-METHOD | curl | forbidden | Supply chain security requirement. |
+| PLATFORM | Linux | required | Primary platform. |
+| PLATFORM | macOS | supported | Supported for development use. |
+| PLATFORM | Windows | supported | Supported via stdio transport only in v1. |
+
+---
+
+## DELIVERABLES
+
+Defines the files a translator must produce. All required OUTPUT-FORMATs
+must be produced. Supported OUTPUT-FORMATs are produced if active in preset.
+
+### Delivery Order
+
+1. Core implementation files
+2. Required packaging artifacts (RPM, DEB, OCI)
+3. Supported artifacts if preset active
+4. TRANSLATION_REPORT.md last, after all files verified and compiled
+
+### Deliverables Table
+
+| OUTPUT-FORMAT | Constraint | Required Deliverable Files | Notes |
+|---|---|---|---|
+| source | required | `main.go`, `go.mod` | Single file preferred under ~800 lines. Tool handlers may be split into `tools.go`, `resources.go` etc. for larger servers. |
+| build | required | `Makefile` | Targets: `build`, `test`, `install`, `clean`. CGO_ENABLED=0. |
+| docs | required | `README.md` | Must document: installation (zypper/apt/dnf), invocation (stdio and http modes), tool list with descriptions, configuration. |
+| license | required | `LICENSE` | Full license text or reference to SPDX identifier with authoritative URL. |
+| RPM | required | `{n}.spec` | OBS RPM spec. Must include systemd service unit for http transport mode. |
+| DEB | required | `debian/control`, `debian/changelog`, `debian/rules`, `debian/copyright` | DEP-5 copyright. Must include systemd service unit. |
+| OCI | required | `Containerfile` | Multi-stage build. Final stage FROM scratch or distroless. Expose port 8080 for http transport. ENTRYPOINT default to http mode. |
+| report | required | `TRANSLATION_REPORT.md` | Must include: framework choice rationale, transport implementation notes, tool list with descriptions, compilation result. |
+
+### Systemd Service Unit
+
+For http transport mode, a systemd service unit is required in both RPM
+and DEB packaging:
+
+```ini
+[Unit]
+Description={component name} MCP server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/mcp-server-{n} http listen=127.0.0.1:8080
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Deliverable Content Requirements
+
+**main.go must implement both transports:**
+```go
+// Invocation:
+//   mcp-server-{n} stdio          ← serve over stdin/stdout
+//   mcp-server-{n} http           ← serve over HTTP (default: 127.0.0.1:8080)
+//   mcp-server-{n} http listen=host:port
+func main() {
+    // Parse transport from first argument (bare word: stdio | http)
+    // Parse key=value options
+    // Initialise server with capabilities declared in spec
+    // Run selected transport
+}
+```
+
+**go.mod framework selection:**
+
+For mcp-go (default):
+```
+require github.com/mark3labs/mcp-go vX.Y.Z
+```
+
+For go-sdk (alternative):
+```
+require github.com/modelcontextprotocol/go-sdk vX.Y.Z
+```
+
+**Containerfile:**
+```dockerfile
+FROM golang:1.24 AS builder
+WORKDIR /build
+COPY . .
+RUN CGO_ENABLED=0 go build -o mcp-server-{n} .
+
+FROM scratch
+COPY --from=builder /build/mcp-server-{n} /usr/bin/mcp-server-{n}
+EXPOSE 8080
+ENTRYPOINT ["/usr/bin/mcp-server-{n}", "http"]
+```
+
+---
+
+## BEHAVIOR: stdio-transport
+
+INPUTS:
+```
+(reads JSON-RPC 2.0 messages from stdin)
+```
+
+OUTPUTS:
+```
+(writes JSON-RPC 2.0 messages to stdout)
+```
+
+PRECONDITIONS:
+- stdin is connected to an MCP-compatible host
+- Server capabilities are declared in spec BEHAVIOR sections
+
+POSTCONDITIONS:
+- Server responds to all MCP protocol messages
+- Errors are returned as JSON-RPC error responses, never as panics
+- On EOF from stdin: clean shutdown, exit 0
+- On SIGTERM/SIGINT: drain in-flight requests, exit 0
+
+---
+
+## BEHAVIOR: http-transport
+
+INPUTS:
+```
+listen: string   // host:port to bind; default 127.0.0.1:8080
+```
+
+OUTPUTS:
+```
+(serves HTTP POST /mcp for requests)
+(serves GET /mcp with SSE for streaming)
+```
+
+PRECONDITIONS:
+- listen address is available and bindable
+- Server capabilities declared in spec BEHAVIOR sections
+
+POSTCONDITIONS:
+- Server accepts connections on listen address
+- POST /mcp handles JSON-RPC 2.0 requests
+- GET /mcp streams Server-Sent Events for streaming responses
+- On SIGTERM/SIGINT: drain in-flight requests, close listener, exit 0
+- Errors returned as HTTP 4xx/5xx with JSON-RPC error body
+
+---
+
+## PRECONDITIONS
+
+- Both stdio and streamable-http transports must be implemented
+- At least one MCP tool must be declared in the spec BEHAVIOR sections
+- All tool names must match ToolName type (lowercase, no spaces)
+- External service dependencies must be declared in DEPLOYMENT section
+- Server must not read configuration from environment variables
+
+---
+
+## POSTCONDITIONS
+
+- Binary serves both transports from the same binary
+- Transport selected by bare word argument (stdio | http)
+- All tools declared in spec BEHAVIOR sections are registered and callable
+- All errors are JSON-RPC 2.0 error responses
+- Server handles concurrent tool calls safely (Go goroutines)
+- Systemd service units are included in RPM and DEB packaging
+
+---
+
+## INVARIANTS
+
+- GLOBAL: both transports always implemented — never one without the other
+- GLOBAL: tool names are lowercase and match ^[a-z][a-z0-9_-]*$
+- GLOBAL: all errors are JSON-RPC 2.0 formatted — no panics reach the client
+- GLOBAL: CGO_ENABLED=0 for Go — static binary, no libc dependency
+- GLOBAL: configuration via key=value only — no environment variables
+- GLOBAL: TRANSLATION_REPORT.md documents the Go framework choice
+- GLOBAL: template version recorded in every audit bundle
+
+---
+
+## EXAMPLES
+
+EXAMPLE: minimal_tool_server_stdio
+GIVEN:
+  spec declares one BEHAVIOR: tool named "greet"
+  invocation: mcp-server-{n} stdio
+  MCP host sends: {"method": "tools/call", "params": {"name": "greet", "arguments": {"name": "World"}}}
+WHEN:
+  server processes the tool call
+THEN:
+  server responds with JSON-RPC result containing greeting text
+  response written to stdout
+  exit_code = 0 on EOF
+
+EXAMPLE: minimal_tool_server_http
+GIVEN:
+  spec declares one BEHAVIOR: tool named "greet"
+  invocation: mcp-server-{n} http listen=127.0.0.1:9000
+WHEN:
+  MCP host sends POST /mcp with tool call JSON-RPC body
+THEN:
+  server returns 200 with JSON-RPC result body
+  server remains running, accepts further requests
+
+EXAMPLE: unknown_transport_argument
+GIVEN:
+  invocation: mcp-server-{n} websocket
+WHEN:
+  server starts
+THEN:
+  stderr = "error: unknown transport 'websocket'. Valid: stdio, http"
+  exit_code = 2
+
+EXAMPLE: tool_error_handling
+GIVEN:
+  invocation: mcp-server-{n} stdio
+  MCP host calls a tool that encounters an internal error
+WHEN:
+  tool handler returns an error
+THEN:
+  server returns JSON-RPC error response (not a panic)
+  stderr contains error log entry with timestamp
+  server continues running and accepts further requests
+
+EXAMPLE: graceful_shutdown_http
+GIVEN:
+  server running in http mode with active connection
+  SIGTERM signal received
+WHEN:
+  signal handler fires
+THEN:
+  server stops accepting new connections
+  in-flight requests complete (up to 30 second drain timeout)
+  server exits 0
+
+EXAMPLE: framework_mcp_go_default
+GIVEN:
+  no preset override for GO-FRAMEWORK
+  translator reads TEMPLATE-TABLE
+WHEN:
+  translator selects Go framework
+THEN:
+  go.mod contains: require github.com/mark3labs/mcp-go
+  TRANSLATION_REPORT.md documents: "GO-FRAMEWORK: mcp-go (template default)"
+  both stdio and http transports implemented using mcp-go API
+
+EXAMPLE: framework_go_sdk_override
+GIVEN:
+  preset declares: GO-FRAMEWORK = go-sdk
+  translator reads resolved preset
+WHEN:
+  translator selects Go framework
+THEN:
+  go.mod contains: require github.com/modelcontextprotocol/go-sdk
+  TRANSLATION_REPORT.md documents: "GO-FRAMEWORK: go-sdk (preset override)"
+  translator notes in report if http transport required workaround
+
+---
+
+## DEPLOYMENT
+
+Runtime: long-running server process, single static binary
+
+Invocation:
+  mcp-server-{n} stdio
+  mcp-server-{n} http
+  mcp-server-{n} http listen=host:port
+
+Transport selection (bare word, first argument):
+  stdio    stdin/stdout JSON-RPC 2.0
+  http     Streamable HTTP on listen address
+
+Key=value options:
+  listen=host:port    HTTP listen address (default: 127.0.0.1:8080)
+
+Output streams:
+  stdout: JSON-RPC 2.0 protocol messages (stdio transport)
+          or unused (http transport — do not mix with protocol messages)
+  stderr: Server logs, errors, startup messages
+
+Naming convention:
+  Binary name: mcp-server-{n}
+  where {n} is the use-case identifier, lowercase, hyphen-separated
+  Examples: mcp-server-pcdp, mcp-server-github, mcp-server-postgres
+
+Installation:
+  OBS package: mcp-server-{n}
+  Available for: openSUSE Leap, SUSE Linux Enterprise, Fedora, Debian/Ubuntu
+  No curl-based installation.
+  Systemd service for http mode included in package.
+
+Platform:
+  Linux (primary, both transports)
+  macOS (supported, both transports)
+  Windows (supported, stdio transport only in v1)
+
+Go Framework Selection Guide:
+  mcp-go (default):  Quick setup, both transports, active community,
+                     slightly more opinionated API
+  go-sdk (alt):      Official spec compliance, Google collaboration,
+                     stdio well-supported; check HTTP transport status
+                     before selecting for production http use
+
+Location: /usr/share/pcdp/templates/mcp-server.template.md
