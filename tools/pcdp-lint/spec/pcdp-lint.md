@@ -2,8 +2,8 @@
 
 ## META
 Deployment:  cli-tool
-Version:     0.3.7
-Spec-Schema: 0.3.7
+Version:     0.3.9
+Spec-Schema: 0.3.9
 Author:      Matthias G. Eckermann <pcdp@mailbox.org>
 License:     GPL-2.0-only
 Verification: none
@@ -48,7 +48,7 @@ DeploymentTemplate := one_of(
   "cli-tool" | "gui-tool" | "cloud-native" | "backend-service" |
   "library-c-abi" | "enterprise-software" | "academic" |
   "python-tool" | "enhance-existing" | "manual" | "template" |
-  "mcp-server"
+  "mcp-server" | "project-manifest"
 )
 // "crypto-library" is retired as of 0.3.6. Use "verified-library" instead.
 // "verified-library" covers all safety- and security-critical C-ABI libraries.
@@ -56,6 +56,8 @@ DeploymentTemplate := one_of(
 // "template" is used exclusively in deployment template definition files
 // (*.template.md). A spec using Deployment: template is a template
 // specification, not a translatable component.
+// "project-manifest" added in v0.3.8 for multi-component projects.
+// "mcp-server" added in v0.3.8 for MCP server components.
 
 Severity := Error | Warning
 
@@ -147,11 +149,12 @@ PRECONDITIONS:
 
 POSTCONDITIONS:
 - exit_code = 0 always
-- stdout contains exactly 16 lines, one per known DeploymentTemplate value
+- stdout contains exactly 17 lines, one per known DeploymentTemplate value
 - each line format: "<template-name>  →  <default-language>"
 - for enhance-existing: "<template-name>  →  (declare Language: in META)"
 - for manual:           "<template-name>  →  (declare Target: in META)"
 - for template:         "<template-name>  →  (template definition file, not translatable)"
+- for project-manifest: "<template-name>  →  (architect artifact, no code generated)"
 - nothing written to stderr
 
 ---
@@ -679,7 +682,7 @@ GIVEN:
 WHEN:
   list-templates is invoked
 THEN:
-  stdout contains exactly 15 lines
+  stdout contains exactly 17 lines
   each line contains template name and default language annotation
   for templates without a companion *.template.md file in the
     search path, annotation is "(template file not found)"
