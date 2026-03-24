@@ -944,7 +944,7 @@ func getSectionLine(lines []string, section string) int {
 
 func getNextSectionLine(lines []string, start int) int {
 	for i := start + 1; i < len(lines); i++ {
-		if strings.HasPrefix(strings.TrimSpace(lines[i]), "##") {
+		if strings.HasPrefix(lines[i], "##") {
 			return i
 		}
 	}
@@ -980,8 +980,10 @@ func stripFencedContent(lines []string) []string {
 	result := make([]string, len(lines))
 	inFence := false
 	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+		// Only recognize fence markers at column 0 (no leading whitespace).
+		// Indented fence markers (e.g. inside GIVEN example blocks) must not
+		// toggle the fence state.
+		if strings.HasPrefix(line, "```") || strings.HasPrefix(line, "~~~") {
 			inFence = !inFence
 			result[i] = "" // blank the fence marker line itself
 			continue
@@ -1025,7 +1027,10 @@ func extractExampleBlocks(lines []string) []ExampleBlock {
 	
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "EXAMPLE:") {
+		// EXAMPLE: must start at column 0 to be a real block marker.
+		// This prevents matches in prose text (e.g. "EXAMPLE:, GIVEN:, WHEN:,")
+		// and in indented content within GIVEN blocks.
+		if strings.HasPrefix(line, "EXAMPLE:") {
 			name := strings.TrimSpace(strings.TrimPrefix(trimmed, "EXAMPLE:"))
 			block := ExampleBlock{
 				Name:          name,
@@ -1040,8 +1045,10 @@ func extractExampleBlocks(lines []string) []ExampleBlock {
 			for j < len(lines) {
 				blockLine := strings.TrimSpace(lines[j])
 				
-				// Stop at next example or section
-				if strings.HasPrefix(blockLine, "EXAMPLE:") || strings.HasPrefix(blockLine, "##") {
+				// Stop at next example or section — use original line for ##
+				// so that indented ## (e.g. "    ## BEHAVIOR/PRIVATE: foo" in
+				// a GIVEN block) does not falsely end the example block.
+				if strings.HasPrefix(lines[j], "EXAMPLE:") || strings.HasPrefix(lines[j], "##") {
 					break
 				}
 				
@@ -1053,9 +1060,11 @@ func extractExampleBlocks(lines []string) []ExampleBlock {
 					givenContent := ""
 					for j < len(lines) {
 						nextLine := strings.TrimSpace(lines[j])
-						if strings.HasPrefix(nextLine, "WHEN:") || strings.HasPrefix(nextLine, "EXAMPLE:") || strings.HasPrefix(nextLine, "##") {
+						// Break only on column-0 markers
+						if strings.HasPrefix(lines[j], "WHEN:") || strings.HasPrefix(lines[j], "EXAMPLE:") || strings.HasPrefix(lines[j], "##") {
 							break
 						}
+						_ = nextLine
 						givenContent += lines[j] + "\n"
 						j++
 					}
@@ -1075,9 +1084,11 @@ func extractExampleBlocks(lines []string) []ExampleBlock {
 					whenContent := ""
 					for j < len(lines) {
 						nextLine := strings.TrimSpace(lines[j])
-						if strings.HasPrefix(nextLine, "THEN:") || strings.HasPrefix(nextLine, "WHEN:") || strings.HasPrefix(nextLine, "EXAMPLE:") || strings.HasPrefix(nextLine, "##") {
+						// Break only on column-0 markers
+						if strings.HasPrefix(lines[j], "THEN:") || strings.HasPrefix(lines[j], "WHEN:") || strings.HasPrefix(lines[j], "EXAMPLE:") || strings.HasPrefix(lines[j], "##") {
 							break
 						}
+						_ = nextLine
 						whenContent += lines[j] + "\n"
 						j++
 					}
@@ -1093,9 +1104,11 @@ func extractExampleBlocks(lines []string) []ExampleBlock {
 					thenContent := ""
 					for j < len(lines) {
 						nextLine := strings.TrimSpace(lines[j])
-						if strings.HasPrefix(nextLine, "WHEN:") || strings.HasPrefix(nextLine, "EXAMPLE:") || strings.HasPrefix(nextLine, "##") {
+						// Break only on column-0 markers
+						if strings.HasPrefix(lines[j], "WHEN:") || strings.HasPrefix(lines[j], "EXAMPLE:") || strings.HasPrefix(lines[j], "##") {
 							break
 						}
+						_ = nextLine
 						thenContent += lines[j] + "\n"
 						j++
 					}
@@ -1130,10 +1143,12 @@ func extractBehaviorSections(lines []string) []BehaviorSection {
 				name = strings.TrimSpace(strings.TrimPrefix(trimmed, "## BEHAVIOR/INTERNAL:"))
 			}
 			
-			// Find end of section
+			// Find end of section — use original line for ## check so that
+			// indented ## within STEPS or GIVEN content doesn't falsely end
+			// the section.
 			endLine := len(lines) - 1
 			for j := i + 1; j < len(lines); j++ {
-				if strings.HasPrefix(strings.TrimSpace(lines[j]), "##") {
+				if strings.HasPrefix(lines[j], "##") {
 					endLine = j - 1
 					break
 				}
