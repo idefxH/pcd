@@ -1,3 +1,4 @@
+
 I am providing two files:
 
 1. cli-tool.template.md — a deployment template that defines
@@ -12,53 +13,71 @@ Implement the component in full, exactly as specified. Do not add
 features not described in the specification. Do not omit any
 specified behaviour.
 
-Derive the target language from the deployment template:
-the template declares the default language and valid alternatives.
-Use the default unless a project preset overrides it — if you deviate
-from the default, state why explicitly.
+Target language is Go (derived from the cli-tool template default).
 
-Produce all deliverables required by the deployment template's
-DELIVERABLES section. For each OUTPUT-FORMAT marked required or
-supported in the template, produce the files listed in the DELIVERABLES
-table. Do not enumerate these files yourself — read them from the
-template's DELIVERABLES section.
+## Resuming a partial run
 
-When asked to write a LICENSE file, never attempt to write the full 
-LICENSE to disk, but only include name, basic information, and 
-link/reference to the autorative wording of the LICENSE.
+Before writing any file, read the output directory. If any of the
+files listed below already exist and are non-empty, do not overwrite
+them — treat them as complete and move to the next missing file.
+Report which files you found and which you are producing.
 
-Deliver the implementation as follows, depending on your environment:
+## Required deliverables and delivery order
 
-1. If you have access to a filesystem or MCP server (git, GitHub,
-   or similar): write the source files directly. Commit or push
-   if possible, and report the location.
+Produce files in this exact order. Complete each file fully before
+starting the next.
 
-2. If you have code execution capability but no persistent storage:
-   write the files within your execution environment and present
-   them as downloadable artifacts.
+Phase 1 — Core implementation:
+  main.go
+  go.mod
 
-3. If you are running in a browser sandbox or have no filesystem
-   access: deliver the complete source code inline in your response,
-   as clearly separated files with explicit filenames.
+Phase 2 — Build and packaging:
+  Makefile
+  pcdp-lint.spec
+  debian/control
+  debian/changelog
+  debian/rules
+  debian/copyright
+  LICENSE
+
+Phase 3 — Documentation and report (last):
+  README.md
+  TRANSLATION_REPORT.md
+
+Do not produce TRANSLATION_REPORT.md until all other files are
+written and verified on disk. If you are interrupted, restart from
+the first missing file in the order above.
+
+## LICENSE
+
+Never write the full GPL-2.0-only license text to disk. Write only:
+name, one-line description, and a reference to the authoritative
+source. The full text is managed separately.
+
+## Delivery
+
+You have access to a filesystem MCP server. Write all files directly
+to disk. Report each file path as you complete it.
 
 Do not attempt to compile, execute, or install anything unless
-explicitly asked. Do not invent a delivery mechanism not listed above.
+explicitly asked.
 
-The deployment template describes the target runtime environment of
-the generated artifact, not the environment where this prompt is
-being evaluated. Do not make language or toolchain decisions based
-on what is available in your current execution environment.
+## Translation report
 
-Produce a translation report covering:
-- Which deployment template default you used for target language,
-  and whether any preset overrides it
-- Which delivery mode you used and why
-- Any specification ambiguities you encountered
+TRANSLATION_REPORT.md must cover:
+- Target language and why (template default, no preset override)
+- Delivery mode used
+- How STEPS ordering was followed for each BEHAVIOR block
+- Any specification ambiguities encountered
 - Any rules you could not implement exactly as written, and why
-- Your confidence level per EXAMPLE (0-100%) that the implementation
-  satisfies each example in the specification
+- Your confidence per EXAMPLE as a table with these exact columns:
+
+  | EXAMPLE | Confidence | Verification method | Unverified claims |
+
+  A claim is verified only if it references a specific named test
+  function that passes without a live external service.
+  Unverified claims must be listed explicitly — never silently omitted.
 
 Do not ask clarifying questions. If the specification is ambiguous,
 make the most conservative interpretation, implement it, and note
 the ambiguity in the translation report.
-

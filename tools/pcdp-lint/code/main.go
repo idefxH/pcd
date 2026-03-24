@@ -225,20 +225,26 @@ func lint(filename string, strict bool) LintResult {
 		os.Exit(2)
 	}
 
+	// Strip fenced content once before applying any rules.
+	// This prevents structural markers inside code fences (EXAMPLE:, WHEN:,
+	// THEN:, ## BEHAVIOR:, STEPS:, etc.) from being parsed as real structure.
+	// Line indices are preserved so diagnostic line numbers remain correct.
+	cleanLines := stripFencedContent(lines)
+
 	// Apply all rules
-	result.Diagnostics = append(result.Diagnostics, rule01RequiredSections(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule02MetaFields(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule03DeploymentTemplate(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule04DeprecatedFields(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule05VerificationField(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule06ExamplesStructure(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule07ExamplesContent(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule08BehaviorSteps(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule09InvariantTags(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule10NegativePathExamples(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule11ToolchainConstraints(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule12CrossSectionConsistency(lines)...)
-	result.Diagnostics = append(result.Diagnostics, rule13BehaviorConstraints(lines)...)
+	result.Diagnostics = append(result.Diagnostics, rule01RequiredSections(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule02MetaFields(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule03DeploymentTemplate(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule04DeprecatedFields(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule05VerificationField(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule06ExamplesStructure(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule07ExamplesContent(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule08BehaviorSteps(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule09InvariantTags(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule10NegativePathExamples(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule11ToolchainConstraints(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule12CrossSectionConsistency(cleanLines)...)
+	result.Diagnostics = append(result.Diagnostics, rule13BehaviorConstraints(cleanLines)...)
 
 	// Sort diagnostics by line number
 	sort.Slice(result.Diagnostics, func(i, j int) bool {
@@ -964,6 +970,29 @@ func isValidSPDXLicense(license string) bool {
 	}
 	
 	return false
+}
+
+// stripFencedContent returns a copy of lines where all content inside
+// code-fence markers (lines beginning with ``` or ~~~) is replaced with
+// empty strings. Line indices are preserved so diagnostic line numbers
+// remain correct. The fence marker lines themselves are also blanked.
+func stripFencedContent(lines []string) []string {
+	result := make([]string, len(lines))
+	inFence := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			result[i] = "" // blank the fence marker line itself
+			continue
+		}
+		if inFence {
+			result[i] = "" // blank fenced content
+		} else {
+			result[i] = line
+		}
+	}
+	return result
 }
 
 // Types for parsing structures
