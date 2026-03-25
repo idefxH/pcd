@@ -1,0 +1,45 @@
+# PCDP icon — nib in brackets + wordmark
+# For beamer footer: 20x20px via Makefile
+#
+# make pcdp-icon-green.png
+
+# Left bracket [
+line thick \
+  from (0.18in, 0.50in) \
+  to   (0.10in, 0.50in) \
+  then to (0.10in, 0.10in) \
+  then to (0.18in, 0.10in) \
+  color 0x30ba78
+
+# Right bracket ]
+line thick \
+  from (0.42in, 0.50in) \
+  to   (0.50in, 0.50in) \
+  then to (0.50in, 0.10in) \
+  then to (0.42in, 0.10in) \
+  color 0x30ba78
+
+# Nib — diamond outline
+line \
+  from (0.30in, 0.50in) \
+  to   (0.40in, 0.30in) \
+  then to (0.30in, 0.10in) \
+  then to (0.20in, 0.30in) \
+  then to (0.30in, 0.50in) \
+  color 0x30ba78
+
+# Nib centre split
+line thin \
+  from (0.30in, 0.30in) \
+  to   (0.30in, 0.10in) \
+  color 0x30ba78
+
+# Ink drop
+circle rad 0.030in \
+  at (0.30in, 0.055in) \
+  fill 0x30ba78 color 0x30ba78
+
+# Wordmark
+"PCDP" bold \
+  at (0.30in, -0.1in) \
+  color 0x30ba78
