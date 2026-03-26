@@ -2910,8 +2910,7 @@ comparison report. This is itself a candidate for specification under PCDP
 | 0.3.1 | 2026-03-17 | Changelog moved to end. A.12 industry landscape. BEHAVIOR/INTERNAL. |
 | 0.3.0 | 2026-03-17 | Deployment template system. Target: removed from META. |
 | 0.2.3 | 2026-02-10 | Workflow diagram. Dual-path architecture. |
-| 0.2.1 | 2026-02-10 | Initial public draft. |
-
-
-
+| 0.2.1 | 2026-02-10 | Change the collaborating AI |
+| 0.1.0 | 2026-01-10 | First draft tracked in GIT  |
+| 0.0.0 | 2026-01-05 | Start thinking about "Optimizing Programming Languages for AI and Human Review" |
 
