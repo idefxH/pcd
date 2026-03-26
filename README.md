@@ -1,3 +1,4 @@
+
 # PCDP — Post-Coding Development Paradigm
 
 **Human Intent, Machine Implementation.**
@@ -162,15 +163,62 @@ Use the standard translator prompt from `prompts/prompt.md` with any capable LLM
 
 ---
 
-## Self-Hosting
+## Tooling
 
-`pcdp-lint` — the validator in `tools/pcdp-lint/` — was developed using PCDP itself. The specification in `tools/pcdp-lint/spec/pcdp-lint.md` describes what the tool must do. The implementation in `tools/pcdp-lint/code/` was generated from that specification by an LLM, using `cli-tool.template.md` as the deployment template.
+### pcdp-lint
+
+`pcdp-lint` — the validator in `tools/pcdp-lint/` — was specified and generated using PCDP itself. The specification in `tools/pcdp-lint/spec/pcdp-lint.md` describes what the tool must do. The implementation in `tools/pcdp-lint/code/` was generated from that specification by an LLM, using `cli-tool.template.md` as the deployment template.
 
 The LLM resolved Go as the target language from the template without being told. It produced the source code, RPM spec, Debian packaging, and a `TRANSLATION_REPORT.md` — all from the specification alone.
 
-The same approach was tested across multiple LLMs of different capability classes, including a 120B open-weight model running at a regional European provider with no dependency on US cloud infrastructure. Every model resolved the target language correctly from the deployment template.
+### mcp-server-pcdp
 
-This is not a toy example. The paradigm specifies and generates its own tooling from the first real artifact.
+`mcp-server-pcdp` is an MCP server that makes the full PCDP toolchain accessible to any MCP-capable LLM host (mcphost, Claude Desktop, VS Code, KIT, custom agents) — no local file copies of templates or prompts needed.
+
+**Tools** (callable by the LLM):
+
+| Tool | Description |
+|---|---|
+| `list_templates` | List all installed deployment templates |
+| `get_template` | Retrieve a template by name |
+| `list_resources` | List all available resources (templates, prompts, hints) |
+| `read_resource` | Read any resource by `pcdp://` URI |
+| `lint_content` | Validate a spec given as a string — returns structured diagnostics |
+| `lint_file` | Validate a spec file on disk |
+| `get_schema_version` | Return the Spec-Schema version the server was built against |
+
+**Resources** (browseable by the LLM natively):
+
+| URI pattern | Content |
+|---|---|
+| `pcdp://templates/{name}` | Full deployment template Markdown |
+| `pcdp://prompts/interview` | The interview prompt — guides spec authoring |
+| `pcdp://prompts/translator` | The universal translator prompt |
+| `pcdp://hints/{template}.{lang}.{lib}` | Library-specific translator hints |
+
+**Usage with mcphost:**
+
+```yaml
+mcpServers:
+  pcdp:
+    command: mcp-server-pcdp
+    args: [stdio]
+```
+
+A connected LLM can then conduct the full PCDP workflow in a single session:
+read the interview prompt → interview the domain expert → write the spec →
+call `lint_content` → fix errors → read the template → translate to code.
+
+`mcp-server-pcdp` is itself specified in `tools/mcp-server-pcdp/spec/mcp-server-pcdp.md`
+and generated using PCDP. Self-hosting all the way down.
+
+### Empirical results
+
+Both tools were tested across multiple LLMs and model sizes — including small
+frontier models via direct API and a 120B open-weight model at a regional EU
+provider. Every model resolved Go as the target language from the deployment
+template without being told. All implementations passed their compile gates and
+test suites without hand-written code.
 
 ---
 
@@ -189,7 +237,8 @@ pcdp/
 │
 ├── hints/
 │   ├── cloud-native.go.go-libvirt.hints.md
-│   └── cloud-native.go.golang-crypto-ssh.hints.md
+│   ├── cloud-native.go.golang-crypto-ssh.hints.md
+│   └── mcp-server.go.mcp-go.hints.md
 │
 ├── templates/
 │   ├── cli-tool.template.md
@@ -201,8 +250,11 @@ pcdp/
 │   └── python-tool.template.md
 │
 ├── tools/
-│   └── pcdp-lint/                     ← GPL-2.0-only
-│       ├── spec/pcdp-lint.md          ← specification
+│   ├── pcdp-lint/                     ← GPL-2.0-only
+│   │   ├── spec/pcdp-lint.md          ← specification
+│   │   └── code/                      ← generated implementation
+│   └── mcp-server-pcdp/               ← GPL-2.0-only
+│       ├── spec/mcp-server-pcdp.md    ← specification
 │       └── code/                      ← generated implementation
 │
 ├── examples/
@@ -229,7 +281,7 @@ The CC-BY-4.0 license on specifications and templates means anyone may implement
 
 ## Status
 
-Current version: **0.3.15** (draft)
+Current version: **0.3.17** (draft)
 
 This project is in active development. The specification format, deployment templates, and tooling are stabilising toward a v1.0 release. Feedback, issue reports, and contributions are welcome.
 
@@ -238,3 +290,4 @@ This project is in active development. The specification format, deployment temp
 ## Author
 
 Matthias G. Eckermann — [pcdp@mailbox.org](mailto:pcdp@mailbox.org)
+

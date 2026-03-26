@@ -1,11 +1,12 @@
 
 
 
+
 # Post-Coding Development Paradigm
 ## Human Intent, Machine Implementation
 
 **Status:** Draft  
-**Version:** 0.3.17  
+**Version:** 0.3.18  
 **Author:** Matthias G. Eckermann <pcdp@mailbox.org>  
 **Date:** 2026-03-24
 
@@ -2508,78 +2509,101 @@ Imports:
 
 ### Motivation
 
-The filesystem-based template system (TEMPLATE_DIR, systemd-style preset
-layering) works well for single-developer use. For teams and enterprises,
-a network-accessible MCP server is more practical:
+The filesystem-based template system works well for single-developer use.
+`mcp-server-pcdp` makes the full PCDP toolchain accessible to any MCP-capable
+LLM host — no local file copies of templates, prompts, or hints required.
+The LLM connects to the server and has everything it needs in one session.
 
-- Templates and presets managed centrally, not per-machine
-- Org-specific template customisations deployed without touching developer machines
-- Any MCP-capable host (mcphost, VS Code, Claude Desktop, web UI) can
-  access templates and validation without filesystem configuration
-- Versioned template registry: `cli-tool@0.3.8` and `cli-tool@latest` simultaneously
-- Access control: teams can have private templates not in the public registry
+Benefits over filesystem-only access:
 
-### Architecture
+- Templates, prompts, and hints served centrally — no per-machine installation
+- Any MCP-capable host (mcphost, Claude Desktop, VS Code, KIT, custom agents)
+  connects with a single config entry
+- Lint validation returns structured diagnostics the LLM can act on directly
+- Self-describing: LLM hosts can browse the full resource space via MCP native
+  resource protocol without prior knowledge of URI patterns
 
-`mcp-server-pcdp` is a single MCP server exposing three tool groups:
+### Tools
 
-```
-mcp-server-pcdp
-├── template/*
-│   ├── list          list available templates with versions
-│   ├── get           retrieve a template by name and version
-│   └── resolve       resolve effective settings after preset layering
-│
-├── lint/*
-│   ├── validate      run pcdp-lint rules against a spec, return diagnostics
-│   └── check-project validate a full project manifest and all imports
-│
-└── project/*
-    ├── get-interface  retrieve exported interface from a spec
-    └── resolve-imports resolve all imports for a spec
-```
+Seven tools covering the full PCDP workflow:
+
+| Tool | Description |
+|---|---|
+| `list_templates` | List all installed deployment templates with version and default language |
+| `get_template` | Retrieve full template content by name and version |
+| `list_resources` | List all available resources (templates, prompts, hints) |
+| `read_resource` | Read any resource by `pcdp://` URI |
+| `lint_content` | Validate a PCDP spec given as a string; returns structured diagnostics |
+| `lint_file` | Validate a spec file on disk; returns structured diagnostics |
+| `get_schema_version` | Return the Spec-Schema version the server was built against |
+
+### Resources
+
+Resources are browseable natively by any MCP client — no tool call required:
+
+| URI pattern | Content |
+|---|---|
+| `pcdp://templates/{name}` | Full deployment template Markdown |
+| `pcdp://prompts/interview` | Interview prompt — guides AI-assisted spec authoring |
+| `pcdp://prompts/translator` | Universal translator prompt |
+| `pcdp://hints/{template}.{lang}.{lib}` | Library-specific translator hints |
+
+Prompt content is compiled into the binary as string constants — no runtime
+filesystem dependency and no separate install path for prompts.
 
 ### The LLM as Wizard
 
-The spec-authoring guidance (what was previously conceived as `pcdp-wizard`)
-is not a server responsibility — it is the LLM's role. An LLM connected to
-`mcp-server-pcdp` via any MCP-capable host can:
+The server provides the data and validation layer; the LLM provides the
+conversational layer. A connected LLM can run the complete PCDP workflow
+in a single session without any manual file handling:
 
-1. Call `template/list` to show available deployment templates
-2. Call `template/get` to retrieve the selected template
-3. Ask the user the right questions based on the template's required fields
-4. Call `lint/validate` to check the spec as it is being written
-5. Iterate until lint passes
+1. Read `pcdp://prompts/interview` → conduct spec authoring interview
+2. Call `lint_content` on the produced spec → receive structured diagnostics
+3. Fix any errors → call `lint_content` again until clean
+4. Read `pcdp://templates/{name}` → translate spec to code
+5. Iterate
 
-No wizard tool needed. The MCP server provides the data and validation layer;
-the LLM provides the conversational layer. This works in mcphost, VS Code
-with Copilot, Claude Desktop, or any other MCP-capable environment without
-any changes to the server.
+No wizard tool. No file copying. No manual prompt management.
 
-### Preset Layering via MCP
+### Transports
 
-The server implements the same systemd-style layering as the filesystem
-approach, but resolved server-side:
+Both transports are implemented in the same binary, selected by bare-word argument:
 
-```
-vendor defaults      built into server binary
-org presets          /etc/mcp-server-pcdp/presets/
-team presets         per-request context header
-user presets         per-request context header
+```bash
+mcp-server-pcdp stdio   # for mcphost, Claude Desktop, VS Code
+mcp-server-pcdp http    # for web-based hosts; default listen: 127.0.0.1:8080
 ```
 
-A client requesting `template/resolve` passes its context (org, team, user)
-and receives the fully-merged effective settings — no client-side merging needed.
+**mcphost config (stdio):**
+```yaml
+mcpServers:
+  pcdp:
+    command: mcp-server-pcdp
+    args: [stdio]
+```
 
-### Implementation
+**mcphost config (HTTP, if running as service):**
+```yaml
+mcpServers:
+  pcdp:
+    url: http://127.0.0.1:8080/mcp
+```
 
-`mcp-server-pcdp` is specified using PCDP (`mcp-server-pcdp.md`) with
-`Deployment: mcp-server`. Default implementation language: Go.
-It is generated from that spec. Self-hosting applies.
+### Implementation and self-hosting
 
-The `mcp-server` deployment template (to be written in v0.3.9) defines
-the full constraint set for MCP server components: transport (stdio / HTTP+SSE),
-tool registration format, error response conventions, and packaging.
+`mcp-server-pcdp` is specified in PCDP format at
+`tools/mcp-server-pcdp/spec/mcp-server-pcdp.md` with `Deployment: mcp-server`.
+The implementation is generated from that spec. Self-hosting applies.
+
+The `mcp-server` deployment template (`templates/mcp-server.template.md`) defines
+the full constraint set: transport requirements (stdio + streamable-HTTP both
+required), framework selection (mcp-go v0.46.0 default), container base image
+(`registry.suse.com/bci/golang:latest` — never unqualified names), packaging,
+and the six-phase EXECUTION section governing the translation run.
+
+The server was translated by Claude Haiku via direct API call (no MCP
+infrastructure, no filesystem server) and passed its compile gate and test
+suite. See A.14 for the LLM-G empirical run details.
 
 ## A.18 Improving Translation Confidence
 
@@ -2891,6 +2915,7 @@ comparison report. This is itself a candidate for specification under PCDP
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.3.18 | 2026-03-26 | A.17 rewritten: mcp-server-pcdp now fully specified, implemented, and tested. Updated to reflect actual tool set (7 tools), native MCP resource registration, embedded prompts, dual transports, registry.suse.com container base. README updated: Self-Hosting expanded to Tooling section covering both pcdp-lint and mcp-server-pcdp; repository layout updated. |
 | 0.3.17 | 2026-03-25 | A.14 updated: LLM-G run added (small frontier model, direct API, no MCP, 15/15 tests pass, full compile gate, two-layer prompt v0.3.16 validated end-to-end). Models and deliverables tables updated. |
 | 0.3.16 | 2026-03-25 | Two-layer prompt architecture: prompts/prompt.md is now fully language-agnostic; all delivery phases, resume logic, and compile gate instructions moved to template ## EXECUTION sections. EXECUTION section added to cli-tool, cloud-native, and mcp-server templates. RULE-14 added to pcdp-lint: deployment templates must have ## EXECUTION section. A.13 rewritten to document the two-layer design. |
 | 0.3.15 | 2026-03-25 | Added AI-interview workflow for spec authoring. Introduction principle 1 updated: domain experts no longer need to learn the spec format; prompts/interview-prompt.md guides any LLM to conduct a structured interview and produce a complete spec. A.4 Phase 0 and Phase 1 updated to reflect interview-based approach. |
@@ -2913,4 +2938,5 @@ comparison report. This is itself a candidate for specification under PCDP
 | 0.2.1 | 2026-02-10 | Change the collaborating AI |
 | 0.1.0 | 2026-01-10 | First draft tracked in GIT  |
 | 0.0.0 | 2026-01-05 | Start thinking about "Optimizing Programming Languages for AI and Human Review" |
+
 
