@@ -731,32 +731,105 @@ func isValidSPDXLicense(license string) bool {
 	return validSPDXLicenses[license]
 }
 
+// templateSearchDirs returns directories to search for template files.
+// Later entries take precedence (last-wins merge).
+func templateSearchDirs() []string {
+	dirs := []string{"/usr/share/pcdp/templates"}
+	if info, err := os.Stat("/etc/pcdp/templates"); err == nil && info.IsDir() {
+		dirs = append(dirs, "/etc/pcdp/templates")
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		d := filepath.Join(home, ".config", "pcdp", "templates")
+		if info, err := os.Stat(d); err == nil && info.IsDir() {
+			dirs = append(dirs, d)
+		}
+	}
+	if info, err := os.Stat(".pcdp/templates"); err == nil && info.IsDir() {
+		dirs = append(dirs, ".pcdp/templates")
+	}
+	return dirs
+}
+
+// findTemplateFile searches all template dirs (later wins) for <name>.template.md.
+// Returns the path of the last match found, or "" if none.
+func findTemplateFile(name string) string {
+	found := ""
+	for _, dir := range templateSearchDirs() {
+		candidate := filepath.Join(dir, name+".template.md")
+		if _, err := os.Stat(candidate); err == nil {
+			found = candidate
+		}
+	}
+	return found
+}
+
+// readDefaultLanguage scans a template file for the LANGUAGE default row
+// in the TEMPLATE-TABLE section and returns the value (e.g. "Go", "Python").
+// Returns "" if not found.
+func readDefaultLanguage(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	inTable := false
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "## TEMPLATE-TABLE" {
+			inTable = true
+			continue
+		}
+		if inTable && strings.HasPrefix(trimmed, "## ") {
+			break
+		}
+		if inTable {
+			// Match: | LANGUAGE | <value> | default | ... |
+			parts := strings.Split(trimmed, "|")
+			if len(parts) >= 4 {
+				key := strings.TrimSpace(parts[1])
+				val := strings.TrimSpace(parts[2])
+				constraint := strings.TrimSpace(parts[3])
+				if key == "LANGUAGE" && constraint == "default" && val != "" {
+					return val
+				}
+			}
+		}
+	}
+	return ""
+}
+
 func listTemplates() {
-	templates := []struct {
-		name       string
-		annotation string
-	}{
-		{"wasm", "(template file not found)"},
-		{"ebpf", "(template file not found)"},
-		{"kernel-module", "(template file not found)"},
-		{"verified-library", "(template file not found)"},
-		{"cli-tool", "Go"},
-		{"gui-tool", "(template file not found)"},
-		{"cloud-native", "(template file not found)"},
-		{"backend-service", "(template file not found)"},
-		{"library-c-abi", "(template file not found)"},
-		{"enterprise-software", "(template file not found)"},
-		{"academic", "(template file not found)"},
-		{"python-tool", "Python"},
-		{"enhance-existing", "(declare Language: in META)"},
-		{"manual", "(declare Target: in META)"},
-		{"template", "(template definition file, not translatable)"},
-		{"mcp-server", "(template file not found)"},
-		{"project-manifest", "(architect artifact, no code generated)"},
+	// Fixed annotations for special templates that have no companion file
+	// or whose annotation is not derived from a LANGUAGE default.
+	fixed := map[string]string{
+		"enhance-existing": "(declare Language: in META)",
+		"manual":           "(declare Target: in META)",
+		"template":         "(template definition file, not translatable)",
+		"project-manifest": "(architect artifact, no code generated)",
 	}
 
-	for _, t := range templates {
-		fmt.Printf("%s  →  %s\n", t.name, t.annotation)
+	templateNames := []string{
+		"wasm", "ebpf", "kernel-module", "verified-library",
+		"cli-tool", "gui-tool", "cloud-native", "backend-service",
+		"library-c-abi", "enterprise-software", "academic", "python-tool",
+		"enhance-existing", "manual", "template", "mcp-server", "project-manifest",
+	}
+
+	for _, name := range templateNames {
+		annotation, isFixed := fixed[name]
+		if !isFixed {
+			path := findTemplateFile(name)
+			if path == "" {
+				annotation = "(template file not found)"
+			} else {
+				lang := readDefaultLanguage(path)
+				if lang != "" {
+					annotation = lang
+				} else {
+					annotation = "(installed)"
+				}
+			}
+		}
+		fmt.Printf("%s  →  %s\n", name, annotation)
 	}
 	os.Exit(0)
 }

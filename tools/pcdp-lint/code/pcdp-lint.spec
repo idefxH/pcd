@@ -9,7 +9,7 @@ URL:            https://github.com/pcdp/pcdp-lint
 Source0:        pcdp-lint-0.3.13.tar.gz
 
 BuildRequires:  golang >= 1.21
-Requires:       (nothing)
+Requires:       pcdp-templates
 
 %description
 pcdp-lint is a command-line tool that validates specification files written

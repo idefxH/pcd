@@ -36,14 +36,23 @@ SemanticVersion := string where matches "^[0-9]+\.[0-9]+\.[0-9]+$"
 
 TemplatePath := path
 // The directory where deployment template files are found.
-// Set at compile time via build variable TEMPLATE_DIR.
-// Default (Linux): /usr/share/pcdp/templates/
-// Runtime search order (first match wins):
-//   1. TEMPLATE_DIR (compile-time default, read-only)
-//   2. /etc/pcdp/templates/       (system administrator additions)
-//   3. ~/.config/pcdp/templates/  (user additions)
-//   4. ./.pcdp/templates/         (project-local)
+// All four directories are searched; later entries take precedence (last-wins).
+// This means project-local templates override user templates, which override
+// system templates, which override the vendor default.
+//
+// Search order (ascending precedence):
+//   1. /usr/share/pcdp/templates/    vendor default (pcdp-templates package)
+//   2. /etc/pcdp/templates/          system administrator additions
+//   3. ~/.config/pcdp/templates/     user additions
+//   4. ./.pcdp/templates/            project-local
+//
+// Directories that do not exist are silently skipped.
 // v1 supports Linux only. macOS and Windows paths deferred to v2.
+//
+// Implementation: templateSearchDirs() returns the list of existing dirs
+// in ascending precedence order. findTemplateFile(name) returns the path
+// of the last match found across all dirs (not the first). This ensures
+// project-local templates override installed ones.
 
 DeploymentTemplate := one_of(
   "wasm" | "ebpf" | "kernel-module" | "verified-library" |
@@ -192,13 +201,26 @@ PRECONDITIONS:
 - none
 
 STEPS:
-1. Load the canonical DeploymentTemplate value list.
+1. Call templateSearchDirs() to obtain the ordered list of existing template
+   directories (ascending precedence; later entries override earlier).
+   MECHANISM: templateSearchDirs() checks each of the four candidate paths
+   (/usr/share/pcdp/templates, /etc/pcdp/templates, ~/.config/pcdp/templates,
+   ./.pcdp/templates) and includes only those that exist as directories.
 2. For each template T in defined order:
-   a. Attempt to locate companion `{T}.template.md` in the template search path.
-   b. If found: read default language from its TEMPLATE-TABLE.
-      If not found: annotation = "(template file not found)".
+   a. Call findTemplateFile(T) to locate the companion `{T}.template.md`.
+      MECHANISM: findTemplateFile(name) iterates templateSearchDirs() and
+      records the path of each match found; returns the last match (highest
+      precedence). Returns "" if no match in any directory.
+   b. If found: call readDefaultLanguage(path) to extract the default language.
+      MECHANISM: readDefaultLanguage(path) reads the file, locates the
+      ## TEMPLATE-TABLE section, and returns the value from the first row
+      where key=LANGUAGE and constraint=default. Returns "" if not found.
+      If readDefaultLanguage returns "": annotation = "(installed)".
+      If found: annotation = returned language string.
+      If findTemplateFile returned "": annotation = "(template file not found)".
    c. For special values (enhance-existing, manual, template, project-manifest):
-      use the fixed annotation defined in POSTCONDITIONS.
+      use the fixed annotation defined in POSTCONDITIONS regardless of
+      whether a companion file exists.
 3. Write one line per template to stdout in format: "{T}  →  {annotation}".
 4. Exit 0.
 
@@ -1132,14 +1154,22 @@ Parsing approach:
   Exception: fence detection uses TrimSpace(L) (step 2a above) so
   that indented fences inside GIVEN blocks are correctly recognised.
 
-Template search path (compile-time variable TEMPLATE_DIR):
-  Default (Linux): /usr/share/pcdp/templates/
-  Runtime search order (first match wins, later entries take precedence):
-    1. TEMPLATE_DIR                          compiled-in default
-    2. /etc/pcdp/templates/           system administrator
-    3. ~/.config/pcdp/templates/      user
-    4. ./.pcdp/templates/             project-local
+Template search path:
+  All four directories are searched; later entries take precedence (last-wins).
+  Directories that do not exist are silently skipped.
+  Search order (ascending precedence):
+    1. /usr/share/pcdp/templates/    vendor default (pcdp-templates package)
+    2. /etc/pcdp/templates/          system administrator
+    3. ~/.config/pcdp/templates/     user
+    4. ./.pcdp/templates/            project-local
   Platform: Linux only in v1.
+
+Runtime dependency:
+  Requires: pcdp-templates
+  The pcdp-templates package installs template and hints files to
+  /usr/share/pcdp/templates/ and /usr/share/pcdp/hints/.
+  pcdp-lint reads templates from the search path at runtime.
+  pcdp-lint does not install template or hints files itself.
 
 Invocation:
   pcdp-lint <specfile.md>
@@ -1186,8 +1216,8 @@ Installation:
   OBS package: pcdp-tools
   Available for: openSUSE Leap, SUSE Linux Enterprise, Fedora, Debian/Ubuntu
   No curl-based installation.
-  Build variable: TEMPLATE_DIR must be set at OBS build time.
-    openSUSE/SLES default: /usr/share/pcdp/templates/
+  Requires: pcdp-templates (provides template and hints files)
+    openSUSE/SLES default install path: /usr/share/pcdp/templates/
 
 Platform:
   Linux (primary)

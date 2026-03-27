@@ -8,7 +8,7 @@ Build-Depends: golang-go (>= 1.21), debhelper-compat (= 13)
 
 Package: pcdp-lint
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: pcdp-templates, ${shlibs:Depends}, ${misc:Depends}
 Description: Linter for Post-Coding Development Paradigm specifications
  pcdp-lint validates specification files written in the Post-Coding Development
  Paradigm (PCDP) format. It enforces structural rules, semantic validation, and

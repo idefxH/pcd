@@ -84,15 +84,36 @@ Filesystem {
 
 TemplateStore {
   // Provides template and hints content.
-  // In production: reads from /usr/share/pcdp/templates/ layered with
-  // /etc/pcdp/, ~/.config/pcdp/, ./.pcdp/ (same preset hierarchy).
+  // In production: reads from the filesystem search path hierarchy at
+  // startup (last-wins — project-local overrides system):
+  //   1. /usr/share/pcdp/templates/  and  /usr/share/pcdp/hints/
+  //   2. /etc/pcdp/templates/         and  /etc/pcdp/hints/
+  //   3. ~/.config/pcdp/templates/    and  ~/.config/pcdp/hints/
+  //   4. ./.pcdp/templates/           and  ./.pcdp/hints/
+  // Directories that do not exist are silently skipped.
   // In tests: in-memory map.
   required-methods:
     ListTemplates()                        -> TemplateRecord[]
     GetTemplate(name, version)             -> (TemplateRecord, error)
     GetHints(key: HintsKey)                -> (content: string, error)
+    ListHintsKeys()                        -> ([]string, error)
   implementations-required:
-    production:  LayeredTemplateStore
+    production:  LayeredTemplateStore {
+      // Initialised by NewLayeredTemplateStore() which:
+      //   1. Calls templateSearchDirs() and hintsSearchDirs() to get
+      //      ordered lists of existing directories.
+      //   2. Calls loadTemplatesFrom(dir) for each template dir in order.
+      //      loadTemplatesFrom reads all *.template.md files in the dir,
+      //      parses Template-For, Version, and LANGUAGE default from each,
+      //      and stores them in a map[name]map[version]TemplateRecord.
+      //      Later dirs overwrite earlier entries (last-wins).
+      //   3. Calls loadHintsFrom(dir) for each hints dir in order.
+      //      loadHintsFrom reads all *.hints.md files, derives the key
+      //      from the filename (strip .hints.md suffix), stores content.
+      //      Later dirs overwrite earlier entries (last-wins).
+      // parseTemplateMeta(content) extracts Template-For, Version, and
+      // the default LANGUAGE from the ## TEMPLATE-TABLE section.
+    }
     test-double: FakeTemplateStore {
       configurable: Templates []TemplateRecord, Hints map[string]string
     }
@@ -627,13 +648,28 @@ Runtime: Linux service (http transport) or subprocess (stdio transport).
 
 Install locations:
   Binary:        /usr/bin/mcp-server-pcdp
-  Templates:     /usr/share/pcdp/templates/
-  Hints:         /usr/share/pcdp/hints/
   System config: /etc/pcdp/
   Service unit:  /usr/lib/systemd/system/mcp-server-pcdp.service
 
+Template and hints files are NOT installed by this package.
+They are provided by the pcdp-templates package:
+  Templates:     /usr/share/pcdp/templates/   (pcdp-templates)
+  Hints:         /usr/share/pcdp/hints/        (pcdp-templates)
+
 Prompt content is compiled into the binary — no separate install path.
 To update prompts, rebuild the binary from updated source files.
+
+Runtime dependency:
+  Requires: pcdp-templates
+  mcp-server-pcdp reads templates and hints from the filesystem search
+  path at startup. It does not install these files itself.
+
+Template and hints search path (last-wins, ascending precedence):
+  1. /usr/share/pcdp/templates|hints/    vendor default (pcdp-templates)
+  2. /etc/pcdp/templates|hints/          system administrator
+  3. ~/.config/pcdp/templates|hints/     user
+  4. ./.pcdp/templates|hints/            project-local
+  Directories that do not exist are silently skipped.
 
 mcphost config (stdio):
 ```yaml

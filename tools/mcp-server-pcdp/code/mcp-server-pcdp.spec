@@ -8,6 +8,7 @@ URL:            https://github.com/pcdp/mcp-server-pcdp
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  golang >= 1.24
+Requires:       pcdp-templates
 Requires:       systemd
 
 %description
