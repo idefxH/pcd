@@ -35,7 +35,7 @@ This document defines expectations, conventions, and architecture context.
 5. **Credit your work.** Use `Co-Authored-By: <Model> <contact>` in
    commits and documents where AI made a substantive contribution.
 
-6. **Fix the spec, not the code.** This is the core PCDP invariant.
+6. **Fix the spec, not the code.** This is the core PCD invariant.
    If generated code is wrong, update the specification and regenerate.
    Never hand-edit generated implementation files.
 
@@ -43,7 +43,7 @@ This document defines expectations, conventions, and architecture context.
 
 ## What This Project Is
 
-The **Post-Coding Development Paradigm (PCDP)** is an open specification
+The **Post-Coding Development (PCD)** is an open specification
 for a software development paradigm where:
 
 - Domain experts write specifications in structured Markdown
@@ -56,11 +56,11 @@ for a software development paradigm where:
   when used, independent tests, audit trails) — not from spec structure alone
 
 **This is not vibe coding.** In vibe coding, if the output is wrong, you
-edit the code. In PCDP, you fix the specification and regenerate. The spec
+edit the code. In PCD, you fix the specification and regenerate. The spec
 is always the source of truth.
 
 **Key artifacts:**
-- `pcdp-lint` — validates PCDP specification files (RULE-01 through RULE-14)
+- `pcdp-lint` — validates PCD specification files (RULE-01 through RULE-14)
 - `mcp-server-pcdp` — MCP server serving templates, prompts, and hints;
   exposes `lint_content` and `lint_file` tools for in-session validation
 - Deployment templates — define target language, packaging, conventions,
@@ -163,7 +163,7 @@ mcp-server-pcdp http    # default: 127.0.0.1:8080
 ```
 prompts/          — translator prompt, interview prompt, usage guides
 templates/        — deployment templates (*.template.md)
-hints/            — library hints files (*.hints.md — not PCDP specs)
+hints/            — library hints files (*.hints.md — not PCD specs)
 tools/
   pcdp-lint/
     spec/         — canonical pcdp-lint specification
@@ -172,7 +172,7 @@ tools/
     spec/         — canonical mcp-server-pcdp specification
     code/         — generated Go implementation
 doc/              — whitepaper, executive brief, presentation slides
-examples/         — example PCDP specs
+examples/         — example PCD specs
 ```
 
 ---
@@ -204,7 +204,7 @@ examples/         — example PCDP specs
 
 ### Hints files
 - Named: `<template>.<language>.<library>.hints.md`
-- Live in `hints/` — they are **not** PCDP specs
+- Live in `hints/` — they are **not** PCD specs
 - Running `pcdp-lint` against a hints file produces expected errors;
   this is correct behaviour, not a bug
 - Advisory only — cannot override spec invariants or template constraints

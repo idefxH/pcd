@@ -1,18 +1,22 @@
 
 
-# Piccadilly — PCDP — Post-Coding Development Paradigm
+# PiCcaDilly — PCD — Post-Coding Development 
 
 **Human Intent, Machine Implementation.**
 
 *Meet me at the Piccadilly — the place where intent becomes implementation.* 
 
-PCDP is an open specification for a new software development paradigm: domain experts write structured natural-language specifications; AI generates all implementation code. Engineers never write implementation code directly.
+PCD is an open specification for a new software development paradigm: domain experts write structured natural-language specifications; AI generates all implementation code. Engineers never write implementation code directly.
 
 This is not "AI-assisted coding" where developers write code with AI suggestions. This is **post-coding development** where specifications are the primary artifact and code is a generated output.
 
 **The key distinction:** if the generated code is wrong, you never edit the code — you fix the specification and regenerate. The spec is always the source of truth.
 
-`pcdp-lint`, the reference validator in this repository, was itself specified and generated using PCDP — with zero hand-written implementation code.
+`pcdp-lint`, the reference validator in this repository, was itself specified and generated using PCD — with zero hand-written implementation code.
+
+---
+
+Note on naming: The project was originally named "PCDP" (Post-Coding Development Paradigm), but will be renamed to just "PCD" end of March 2026.
 
 ---
 
@@ -170,13 +174,13 @@ Use the standard translator prompt from `prompts/prompt.md` with any capable LLM
 
 ### pcdp-lint
 
-`pcdp-lint` — the validator in `tools/pcdp-lint/` — was specified and generated using PCDP itself. The specification in `tools/pcdp-lint/spec/pcdp-lint.md` describes what the tool must do. The implementation in `tools/pcdp-lint/code/` was generated from that specification by an LLM, using `cli-tool.template.md` as the deployment template.
+`pcdp-lint` — the validator in `tools/pcdp-lint/` — was specified and generated using PCD itself. The specification in `tools/pcdp-lint/spec/pcdp-lint.md` describes what the tool must do. The implementation in `tools/pcdp-lint/code/` was generated from that specification by an LLM, using `cli-tool.template.md` as the deployment template.
 
 The LLM resolved Go as the target language from the template without being told. It produced the source code, RPM spec, Debian packaging, and a `TRANSLATION_REPORT.md` — all from the specification alone.
 
 ### mcp-server-pcdp
 
-`mcp-server-pcdp` is an MCP server that makes the full PCDP toolchain accessible to any MCP-capable LLM host (mcphost, Claude Desktop, VS Code, KIT, custom agents) — no local file copies of templates or prompts needed.
+`mcp-server-pcdp` is an MCP server that makes the full PCD toolchain accessible to any MCP-capable LLM host (mcphost, Claude Desktop, VS Code, KIT, custom agents) — no local file copies of templates or prompts needed.
 
 **Tools** (callable by the LLM):
 
@@ -208,12 +212,12 @@ mcpServers:
     args: [stdio]
 ```
 
-A connected LLM can then conduct the full PCDP workflow in a single session:
+A connected LLM can then conduct the full PCD workflow in a single session:
 read the interview prompt → interview the domain expert → write the spec →
 call `lint_content` → fix errors → read the template → translate to code.
 
 `mcp-server-pcdp` is itself specified in `tools/mcp-server-pcdp/spec/mcp-server-pcdp.md`
-and generated using PCDP. Self-hosting all the way down.
+and generated using PCD. Self-hosting all the way down.
 
 ### Empirical results
 
@@ -228,7 +232,7 @@ test suites without hand-written code.
 ## Repository Layout
 
 ```
-pcdp/
+pcd/
 ├── README.md
 ├── LICENSE                            ← CC-BY-4.0 (specs, templates, whitepaper)
 ├── LICENSE-tools                      ← GPL-2.0-only (tools/)

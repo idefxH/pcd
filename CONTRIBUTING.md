@@ -1,11 +1,11 @@
 
-# Contributing to PCDP
+# Contributing to PCD
 
-Thank you for your interest in contributing to the Post-Coding Development Paradigm (PCDP) project!
+Thank you for your interest in contributing to the Post-Coding Development (PCD) project!
 
 ## Project Overview
 
-PCDP is a paradigm where:
+PCD is a paradigm where:
 - Domain experts write specifications in structured Markdown
 - AI translates specifications into verified implementations  
 - Engineers never write implementation code directly
@@ -13,7 +13,7 @@ PCDP is a paradigm where:
 
 **Key distinction from "vibe coding":**
 - Vibe coding: humans write code + AI suggests
-- PCDP: humans write specs only; AI generates all implementation code
+- PCD: humans write specs only; AI generates all implementation code
 - If generated code is wrong: fix the spec, not the code
 
 ## Getting Started
@@ -36,7 +36,7 @@ pcdp/
 │   ├── cli-tool.template.md      # Complete, production-ready
 │   ├── mcp-server.template.md    # Complete, production-ready
 │   └── ...                       # Various template stubs
-├── tools/                         # PCDP tooling
+├── tools/                         # PCD tooling
 │   └── pcdp-lint/                # Specification validator
 ├── examples/                      # Example specifications
 └── prompts/                       # AI translator prompts
@@ -46,11 +46,11 @@ pcdp/
 
 ### 1. Specification Writing
 
-When writing PCDP specifications:
+When writing PCD specifications:
 
 #### Required META Section Fields
 
-Every PCDP spec must include:
+Every PCD spec must include:
 
 ```markdown
 ## META
@@ -225,7 +225,7 @@ The `pcdp-lint` tool validates specifications against these rules:
 
 #### CLI Conventions
 
-All PCDP tools follow these conventions:
+All PCD tools follow these conventions:
 - Key=value syntax: `pcdp-lint strict=true spec.md`
 - Bare words for commands: `pcdp-lint list-templates`
 - **NO `--flag` style ever** (firm decision)
@@ -315,5 +315,5 @@ If you have questions about contributing, please:
 2. Review the whitepaper in `doc/whitepaper.md`
 3. Contact us at pcdp@mailbox.org
 
-Thank you for contributing to PCDP!
+Thank you for contributing to PCD!
 
