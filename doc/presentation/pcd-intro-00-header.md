@@ -1,7 +1,7 @@
 
 --- 
-title: PCD -- Post-Coding Development
-subtitle: "Meet me at the Piccadilly"
+title: Post-Coding Development
+subtitle: "Meet me at the PiCcaDilly - where intent becomes implementation"
 author: Matthias G. Eckermann
 date: 2026-03-25
 theme: "Frankfurt"
