@@ -9,7 +9,7 @@
 **Status:** Draft  
 **Version:** 0.3.19  
 **Author:** Matthias G. Eckermann <pcd@mailbox.org>  
-**Date:** 2026-03-24
+**Date:** 2026-03-30
 
 ---
 
@@ -28,6 +28,8 @@ The paradigm enables AI-augmented development in **safety-critical and regulated
 **Target language is not a specification concern.** A key design principle introduced in v0.3.0: the target programming language is a *function of the deployment context*, not a free variable that the spec author must decide. Deployment templates encode this mapping, separating architectural intent (the specification) from implementation mechanics (the generated code).
 
 Deliverables include specification schemas, deployment templates, translator prototypes, pluggable IR formats, reference backends (C, Rust, Go, WASM), CI patterns producing audit bundles, and migration guidance for gradual adoption. The `pcd-lint` validator is developed as the paradigm's own reference implementation—eating its own dog food from the first artifact.
+
+**Similar ideas:** At AWS re:Invent 2025, Amazon CTO Werner Vogels—in what he announced as his final re:Invent keynote—dedicated a significant portion of his closing address to spec-driven development, coining the phrase *"Specifications are the new code"* and introducing the concept of *"verification debt"*: the dangerous gap that opens when AI generates code faster than humans can comprehend it. -- Post-Coding Development was conceived and developed independently; the convergence confirms the direction.
 
 ### Value Proposition at a Glance
 
@@ -1879,6 +1881,11 @@ Generates code from freeform natural language prompts. Widely adopted for produc
 **Correct-by-Construction Synthesis (Research)**
 Academic research into automatically synthesising programs from formal specifications exists under labels including "program synthesis", "correct-by-construction development", and "specification-carrying code." Active research groups at MIT, CMU, and several European universities. Key differences: research prototypes, not productised; require formal specification languages (not natural language); no deployment template concept; no pathway to regulated-domain certification.
 
+**AWS Kiro and Spec-Driven Development (Industry, 2025)**
+At AWS re:Invent 2025, Amazon CTO Werner Vogels dedicated his final keynote to spec-driven development as the answer to what he called *verification debt*—the gap between AI code generation speed and human comprehension speed. AWS engineer Clare Liguori demonstrated Kiro, an IDE built around writing specifications before AI generates code, reporting roughly a 2× improvement in shipping time over unstructured AI coding. Vogels explicitly positioned specifications against "vibe coding," citing Dijkstra's formal specifications and the Apollo Guidance System as historical precedents \[Vogels2025\].
+
+Key differences from Post-Coding Development: Kiro is a proprietary, IDE-integrated, AWS-hosted product. It does not define a portable, lintable specification format, has no deployment template abstraction, no formal verification path, no supply chain or packaging conventions, and no pathway to regulated-domain certification. The paradigms are complementary rather than competing. The convergence of Werner Vogels' final keynote with the core thesis of this work—independently developed—is notable external validation of the problem framing.
+
 ### Comparative Summary
 
 | Approach | Human writes | AI layer | Formal verification | Regulated domains | Deployment templates |
@@ -1889,6 +1896,7 @@ Academic research into automatically synthesising programs from formal specifica
 | F* / HACL* | F* code | No | Yes (dependent types) | Yes (crypto) | No |
 | Dafny | Dafny code | No | Yes (SMT) | No | No |
 | LLM code generation | Prompts + code | Yes | No | **Prohibited** | No |
+| AWS Kiro | IDE-guided spec | Yes | No | No | No |
 | Program synthesis (research) | Formal spec language | Partial | Yes | No | No |
 | **Post-Coding Development** | **Structured natural language** | **Yes** | **Optional, pluggable** | **Yes (primary target)** | **Yes** |
 
@@ -2911,6 +2919,12 @@ comparison report. This is itself a candidate for specification under PCD
 — `pcd-compare.md` with `Deployment: cli-tool`.
 
 **Parked for:** v0.3.11 or later, pending specification of `pcd-compare`.
+
+---
+
+## References
+
+- \[Vogels2025\] Werner Vogels, *"The Renaissance Developer"*, AWS re:Invent 2025 Special Closing Keynote, Las Vegas, December 2025. https://www.youtube.com/watch?v=3Y1G9najGiI
 
 ---
 
