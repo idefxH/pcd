@@ -1,143 +1,441 @@
+# python-tool.template.md
+# Template-For: python-tool
+# Version: 0.1.0
+# Spec-Schema: 0.3.19
+# LANGUAGE: python
 
-# python-tool.template
+---
+
+## OVERVIEW
+
+A Python command-line tool. Single executable entry point, src/ layout,
+fully typed, packaged for RPM, DEB, PyPI, and OCI.
+
+---
 
 ## META
-Deployment:  template
-Version:     0.3.13
-Spec-Schema: 0.3.13
-Author:      Matthias G. Eckermann <pcd@mailbox.org>
-License:     CC-BY-4.0
-Verification: none
-Safety-Level: QM
-Template-For: python-tool
-
----
-
-> **Status: Work in Progress**
-> This template is planned for v0.3.8. The definition below is a stub
-> capturing agreed design decisions. It is not yet complete enough for
-> production use. Use `manual` deployment type with explicit META fields
-> until this template is finalised.
-
----
-
-## TYPES
 
 ```
-Language := Python
-// Python is the only valid language for python-tool.
-// No alternatives permitted.
-
-PythonMinVersion := "3.9" | "3.10" | "3.11" | "3.12" | "3.13"
-// Minimum Python version must be declared in DEPLOYMENT section.
-
-DistributionFormat := wheel | sdist
-// Both are required deliverables.
+Name:           {TOOL_NAME}
+Version:        {VERSION}
+Deployment:     python-tool
+Spec-Schema:    0.3.19
+Author:         {AUTHOR_NAME} <{AUTHOR_EMAIL}>
+License:        {LICENSE}
+Python:         >=3.11
+Verification:   none
+Safety-Level:   QM
 ```
 
 ---
 
-## IMPORTANT CONSTRAINTS
+## PROJECT STRUCTURE
 
-**python-tool is QM safety level only.**
-Python is not suitable for safety-critical components. The absence of
-a formal verification path, the dynamic type system, and the interpreted
-execution model make Python incompatible with ISO 26262, DO-178C,
-IEC 62304, and Common Criteria certification requirements.
+```
+{TOOL_NAME}/
+├── pyproject.toml
+├── LICENSE
+├── README.md
+├── src/
+│   └── {PACKAGE_NAME}/
+│       ├── __init__.py
+│       ├── __main__.py
+│       ├── cli.py
+│       └── {CORE_MODULE}.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_{CORE_MODULE}.py
+│   └── test_cli.py
+├── packaging/
+│   ├── {TOOL_NAME}.spec
+│   └── debian/
+│       ├── control
+│       ├── changelog
+│       ├── rules
+│       └── copyright
+├── Containerfile
+└── Makefile
+```
 
-If you need a Python-like developer experience for a safety-critical
-component, consider:
-- `cli-tool` with Go (statically typed, compiled, formally verifiable)
-- `verified-library` with C (for components requiring formal proof)
-
-**python-tool is for:**
-- Development tooling and automation
-- Data pipelines and analysis scripts
-- Test infrastructure
-- Glue code and integration scripts
-- Domain-specific tools where Python ecosystem libraries are required
-
----
-
-## TEMPLATE-TABLE
-
-| Key | Value | Constraint | Notes |
-|-----|-------|------------|-------|
-| VERSION | MAJOR.MINOR.PATCH | required | |
-| SPEC-SCHEMA | MAJOR.MINOR.PATCH | required | |
-| AUTHOR | name <email> | required | Repeating field permitted. |
-| LICENSE | SPDX identifier | required | |
-| LANGUAGE | Python | required | No alternatives. |
-| VERIFICATION | none | required | Formal verification path does not exist for Python. |
-| SAFETY-LEVEL | QM | required | No other safety level permitted. |
-| PYTHON-MIN-VERSION | 3.11 | default | Minimum Python version. Override via preset. |
-| TYPE-CHECKING | mypy | default | mypy or pyright. Replaces compile-time type safety. |
-| RUNTIME-DEPS | declared in pyproject.toml | required | All dependencies pinned in pyproject.toml. |
-| CLI-ARG-STYLE | key=value | required | Consistent with pcd conventions. |
-| NETWORK-CALLS | context-dependent | supported | Declare explicitly in DEPLOYMENT section if used. |
-| OUTPUT-FORMAT | wheel | required | Python wheel (.whl) for pip installation. |
-| OUTPUT-FORMAT | sdist | required | Source distribution for audit and OBS builds. |
-| OUTPUT-FORMAT | RPM | required | OBS RPM package wrapping the wheel. |
-| OUTPUT-FORMAT | DEB | required | OBS DEB package wrapping the wheel. |
-| INSTALL-METHOD | OBS | required | Primary distribution via OBS. |
-| INSTALL-METHOD | pip | supported | pip install from wheel. Acceptable for tooling. |
-| INSTALL-METHOD | curl | forbidden | Supply chain security requirement. |
-| PYPROJECT-TOML | required | required | pyproject.toml with full metadata and pinned deps. |
-| IDEMPOTENT | true | required | Running tool twice on same input produces identical output. |
+INVARIANTS:
+- src/ layout is mandatory — no flat layout
+- One package under src/ — name derived from TOOL_NAME
+  (hyphens replaced with underscores)
+- __main__.py enables: python -m {PACKAGE_NAME}
+- cli.py owns all argparse logic; no argument parsing in other modules
+- Business logic lives in separate modules, never in cli.py
+- tests/ mirrors src/ structure
 
 ---
 
-## DELIVERABLES
+## TOOLCHAIN
 
-*(Full DELIVERABLES section pending — to be completed in v0.3.8)*
+```
+Runtime:   python >= 3.11
+Manager:   uv
+Linting:   flake8
+Format:    black
+Types:     mypy (strict)
+Testing:   pytest + hypothesis
+```
 
-Required deliverables will include:
-- `<n>/` — Python package directory with `__init__.py`
-- `<n>/__main__.py` — entry point for `python -m <n>`
-- `pyproject.toml` — build metadata, dependencies, entry points
-- `README.md` — installation (zypper/apt/dnf/pip), usage, examples
-- `LICENSE` — full license text
-- RPM spec, Debian package files
-- `TRANSLATION_REPORT.md`
+EXECUTION:
+```
+# Setup
+uv sync
+
+# Run
+uv run {TOOL_NAME}
+
+# Lint + format
+uv run flake8 src/ tests/
+uv run black src/ tests/
+
+# Type check
+uv run mypy src/
+
+# Test
+uv run pytest tests/
+
+# Build wheel
+uv build
+```
 
 ---
 
-## PRECONDITIONS
+## pyproject.toml
 
-- Safety-Level must be QM — any other value is rejected by pcd-lint
-- Verification must be none — any other value is rejected by pcd-lint
-- pyproject.toml is a required deliverable
-- Python minimum version must be declared in DEPLOYMENT section
+```toml
+[project]
+name = "{TOOL_NAME}"
+version = "{VERSION}"
+description = "{DESCRIPTION}"
+readme = "README.md"
+license = { text = "{LICENSE}" }
+authors = [{ name = "{AUTHOR_NAME}", email = "{AUTHOR_EMAIL}" }]
+requires-python = ">=3.11"
+dependencies = [
+    # {DEPENDENCIES}
+]
+
+[project.scripts]
+{TOOL_NAME} = "{PACKAGE_NAME}.cli:main"
+
+[project.urls]
+Homepage = "{HOMEPAGE}"
+Repository = "{REPOSITORY}"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{PACKAGE_NAME}"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "flake8>=7.0",
+    "black>=24.0",
+    "mypy>=1.0",
+    "pytest>=8.0",
+    "hypothesis>=6.0",
+]
+```
 
 ---
 
-## POSTCONDITIONS
+## SOURCE FILES
 
-*(Pending — to be completed in v0.3.8)*
+### src/{PACKAGE_NAME}/__init__.py
+
+```python
+# SPDX-License-Identifier: {LICENSE}
+# SPDX-FileCopyrightText: {YEAR} {AUTHOR_NAME} <{AUTHOR_EMAIL}>
+
+"""
+{TOOL_NAME} -- {DESCRIPTION}
+"""
+
+__version__: str = "{VERSION}"
+```
+
+### src/{PACKAGE_NAME}/__main__.py
+
+```python
+# SPDX-License-Identifier: {LICENSE}
+# SPDX-FileCopyrightText: {YEAR} {AUTHOR_NAME} <{AUTHOR_EMAIL}>
+
+"""Enable: python -m {PACKAGE_NAME}"""
+
+from {PACKAGE_NAME}.cli import main
+
+if __name__ == "__main__":
+    main()
+```
+
+### src/{PACKAGE_NAME}/cli.py
+
+```python
+# SPDX-License-Identifier: {LICENSE}
+# SPDX-FileCopyrightText: {YEAR} {AUTHOR_NAME} <{AUTHOR_EMAIL}>
+
+"""CLI entry point -- argument parsing only. No business logic here."""
+
+import argparse
+import logging
+import sys
+
+from {PACKAGE_NAME} import __version__
+from {PACKAGE_NAME}.{CORE_MODULE} import run
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="{TOOL_NAME}",
+        description="{DESCRIPTION}",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging",
+    )
+    # {ADDITIONAL_ARGUMENTS}
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(levelname)s %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
+
+    try:
+        run(args)
+    except KeyboardInterrupt:
+        sys.exit(130)
+    except Exception as exc:
+        logging.getLogger(__name__).error("%s", exc)
+        sys.exit(1)
+```
+
+### src/{PACKAGE_NAME}/{CORE_MODULE}.py
+
+```python
+# SPDX-License-Identifier: {LICENSE}
+# SPDX-FileCopyrightText: {YEAR} {AUTHOR_NAME} <{AUTHOR_EMAIL}>
+
+"""Core business logic -- no CLI concerns here."""
+
+import argparse
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def run(args: argparse.Namespace) -> None:
+    """Entry point called by cli.main()."""
+    logger.debug("starting with args=%r", args)
+    # {IMPLEMENTATION}
+```
+
+---
+
+## TESTING
+
+### tests/test_{CORE_MODULE}.py
+
+```python
+# SPDX-License-Identifier: {LICENSE}
+# SPDX-FileCopyrightText: {YEAR} {AUTHOR_NAME} <{AUTHOR_EMAIL}>
+
+"""Tests for {CORE_MODULE}. Use hypothesis for property-based tests."""
+
+import argparse
+
+from hypothesis import given, strategies as st
+
+from {PACKAGE_NAME}.{CORE_MODULE} import run
+
+
+def test_run_smoke() -> None:
+    args = argparse.Namespace(verbose=False)
+    run(args)  # must not raise
+
+
+# Example property-based test -- adapt or remove
+@given(st.text())
+def test_run_with_input(value: str) -> None:
+    args = argparse.Namespace(verbose=False, input=value)
+    run(args)
+```
+
+---
+
+## PACKAGING
+
+### RPM: packaging/{TOOL_NAME}.spec
+
+```spec
+Name:           {TOOL_NAME}
+Version:        {VERSION}
+Release:        1%{?dist}
+Summary:        {DESCRIPTION}
+
+License:        {LICENSE}
+URL:            {HOMEPAGE}
+Source0:        %{name}-%{version}.tar.gz
+
+BuildArch:      noarch
+BuildRequires:  python3 >= 3.11
+BuildRequires:  python3-pip
+BuildRequires:  python3-build
+Requires:       python3 >= 3.11
+# {RUNTIME_DEPENDENCIES}
+
+%description
+{DESCRIPTION}
+
+%prep
+%autosetup
+
+%build
+python3 -m build --wheel --no-isolation
+
+%install
+pip install --no-deps --root %{buildroot} \
+    dist/%{name}-%{version}-py3-none-any.whl
+
+%files
+%license LICENSE
+%{_bindir}/{TOOL_NAME}
+%{python3_sitelib}/{PACKAGE_NAME}/
+%{python3_sitelib}/{PACKAGE_NAME}-%{version}.dist-info/
+
+%changelog
+* {DATE} {AUTHOR_NAME} <{AUTHOR_EMAIL}> - {VERSION}-1
+- Initial release
+```
+
+### DEB: packaging/debian/control
+
+```
+Source: {TOOL_NAME}
+Section: utils
+Priority: optional
+Maintainer: {AUTHOR_NAME} <{AUTHOR_EMAIL}>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools
+Standards-Version: 4.6.1
+Homepage: {HOMEPAGE}
+
+Package: {TOOL_NAME}
+Architecture: all
+Depends: python3 (>= 3.11), ${python3:Depends}, ${misc:Depends}
+Description: {DESCRIPTION}
+ {LONG_DESCRIPTION}
+```
+
+### OCI: Containerfile
+
+```dockerfile
+FROM registry.opensuse.org/opensuse/leap:15.6
+
+RUN zypper --non-interactive install --no-recommends \
+    python311 \
+    && zypper clean --all
+
+WORKDIR /app
+COPY dist/{TOOL_NAME}-{VERSION}-py3-none-any.whl .
+
+RUN pip3 install --no-cache-dir \
+    {TOOL_NAME}-{VERSION}-py3-none-any.whl
+
+ENTRYPOINT ["{TOOL_NAME}"]
+```
+
+---
+
+## MAKEFILE
+
+```makefile
+.PHONY: all lint format typecheck test build clean
+
+all: lint typecheck test build
+
+lint:
+	uv run flake8 src/ tests/
+
+format:
+	uv run black src/ tests/
+
+typecheck:
+	uv run mypy src/
+
+test:
+	uv run pytest tests/ -v
+
+build:
+	uv build
+
+clean:
+	rm -rf dist/ .mypy_cache/ .pytest_cache/ __pycache__
+```
+
+---
+
+## VARIABLES
+
+| Variable | Required | Description |
+|---|---|---|
+| TOOL_NAME | yes | Hyphenated tool name, e.g. my-tool |
+| PACKAGE_NAME | yes | Python package name (underscores), e.g. my_tool |
+| CORE_MODULE | yes | Main logic module name, e.g. core |
+| VERSION | yes | Semantic version, e.g. 0.1.0 |
+| DESCRIPTION | yes | One-line description |
+| LONG_DESCRIPTION | yes | Multi-line description for DEB |
+| AUTHOR_NAME | yes | Full name |
+| AUTHOR_EMAIL | yes | Email address |
+| LICENSE | yes | SPDX identifier, e.g. GPL-2.0-only |
+| YEAR | yes | Copyright year |
+| HOMEPAGE | yes | Project URL |
+| REPOSITORY | yes | VCS URL |
+| DEPENDENCIES | no | Runtime deps as TOML list entries |
+| RUNTIME_DEPENDENCIES | no | RPM Requires: lines |
+| ADDITIONAL_ARGUMENTS | no | Extra argparse add_argument() calls |
+| IMPLEMENTATION | no | Initial body of run() |
+| DATE | yes | RPM changelog date |
 
 ---
 
 ## INVARIANTS
 
-- [observable]      Safety-Level anything other than QM is rejected at pcd-lint time
-- [observable]      Verification anything other than none is rejected at pcd-lint time
-- [observable]      python-tool components may not be used in safety-critical systems
-- [observable]      template version is recorded in every audit bundle
-
----
-
-## EXAMPLES
-
-*(Pending — to be completed in v0.3.8)*
-*(Reference example: a pcd-validate tool that runs pcd-lint and
-  spec-validate as a Python wrapper)*
-
----
-
-## DEPLOYMENT
-
-Runtime: this file is a template specification, not executable code.
-Location: /usr/share/pcd/templates/python-tool.template.md
-Status: Work in progress — v0.3.8 target for completion.
-Note: python-tool is QM only. Not suitable for safety-critical components.
-
+- SPDX header in every .py file — mandatory, no exceptions
+- LICENSE file present at repo root — mandatory
+- pyproject.toml carries license field — mandatory
+- cli.py contains only argparse setup and main() — no business logic
+- All public functions and methods carry type annotations — mypy strict
+- flake8 and black pass with zero warnings before any commit
+- mypy --strict passes with zero errors before any commit
+- Vendoring is optional — document in README if used
+- OCI base image: openSUSE Leap current release — no Alpine, no Debian
+- Wheel built with uv build or python3 -m build — not setup.py
+- pip install with --no-deps in RPM %install — distro manages deps
+- curl | sh installation: forbidden
