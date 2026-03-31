@@ -2,8 +2,8 @@
 
 ## META
 Deployment:  template
-Version:     0.3.16
-Spec-Schema: 0.3.16
+Version:     0.3.19
+Spec-Schema: 0.3.19
 Author:      Matthias G. Eckermann <pcd@mailbox.org>
 License:     CC-BY-4.0
 Verification: none
@@ -244,10 +244,10 @@ declared as `required` or active `supported`.
 | build | required | `Makefile` | Must include `build`, `test`, `install`, `clean` targets. |
 | service | required | `<n>.service` | systemd unit for Linux service deployment. |
 | docs | required | `README.md` | Must document installation, config file path, arguments, endpoints, and signal handling. |
-| license | required | `LICENSE` | Follow the translator prompt and spec license instructions. |
+| license | required | `LICENSE` | SPDX identifier from spec META + authoritative URL to the full license text. Never reproduce the full license text. |
 | RPM | required | `<n>.spec` | OBS RPM spec file. Must install the binary, service unit, and default config path if spec declares one. |
 | DEB | required | `debian/control`, `debian/changelog`, `debian/rules`, `debian/copyright` | Debian package metadata. Must install the service unit. |
-| OCI | supported | `Containerfile` | Multi-stage build. Final stage must be `FROM scratch` or distroless. Expose only ports declared in the spec DEPLOYMENT section. |
+| OCI | supported | `Containerfile` | Multi-stage build. Builder stage: `FROM registry.suse.com/bci/golang:latest AS builder` for Go — never unqualified names (supply chain security requirement). Final stage: `FROM scratch`. Expose only ports declared in spec DEPLOYMENT. |
 | binary | supported | none | Raw binary only. |
 | report | required | `TRANSLATION_REPORT.md` | Must include service startup/shutdown notes, config-loading notes, and compile gate result. |
 
@@ -274,6 +274,19 @@ WantedBy=multi-user.target
 
 Adjust `ExecStart` and config path only if the spec DEPLOYMENT section declares
 different values. Do not add environment-variable based configuration.
+
+### Deliverable Content Requirements
+
+**Containerfile (when OCI is active in preset):**
+- Must use multi-stage build: builder stage + minimal final stage
+- Builder stage must use `FROM registry.suse.com/bci/golang:latest AS builder`
+  for Go. Never use unqualified names such as `golang:1.24` or `docker.io/golang`.
+  This is a supply chain security requirement, not a preference.
+- Final stage must be `FROM scratch` (static binary; no runtime dependencies)
+- Layer order in builder stage: `COPY go.mod go.sum ./` → `RUN go mod download`
+  → `COPY . .` → `RUN CGO_ENABLED=0 go build`
+- Expose only ports declared in the spec DEPLOYMENT section
+- Do not include a package manager in the final image
 
 ---
 

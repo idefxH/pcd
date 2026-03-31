@@ -4,8 +4,8 @@
 
 ## META
 Deployment:  template
-Version:     0.3.13
-Spec-Schema: 0.3.13
+Version:     0.3.19
+Spec-Schema: 0.3.19
 Author:      Matthias G. Eckermann <pcd@mailbox.org>
 License:     CC-BY-4.0
 Verification: none
@@ -127,7 +127,7 @@ must be produced. Supported OUTPUT-FORMATs are produced if active in preset.
 | source | required | `main.go`, `go.mod` | Single file preferred under ~800 lines. Tool handlers may be split into `tools.go`, `resources.go` etc. for larger servers. |
 | build | required | `Makefile` | Targets: `build`, `test`, `install`, `clean`. CGO_ENABLED=0. |
 | docs | required | `README.md` | Must document: installation (zypper/apt/dnf), invocation (stdio and http modes), tool list with descriptions, configuration. |
-| license | required | `LICENSE` | Full license text or reference to SPDX identifier with authoritative URL. |
+| license | required | `LICENSE` | SPDX identifier from spec META + authoritative URL to the full license text. Never reproduce the full license text. |
 | RPM | required | `{n}.spec` | OBS RPM spec. Must include systemd service unit for http transport mode. |
 | DEB | required | `debian/control`, `debian/changelog`, `debian/rules`, `debian/copyright` | DEP-5 copyright. Must include systemd service unit. |
 | OCI | required | `Containerfile` | Multi-stage build. Builder FROM registry.suse.com/bci/golang:latest. Final stage FROM scratch. Expose port 8080 for http transport. ENTRYPOINT default to http mode. Never use unqualified image names. |

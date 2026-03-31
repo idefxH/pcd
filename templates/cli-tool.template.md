@@ -4,8 +4,8 @@
 
 ## META
 Deployment:  template
-Version:     0.3.13
-Spec-Schema: 0.3.13
+Version:     0.3.19
+Spec-Schema: 0.3.19
 Author:      Matthias G. Eckermann <pcd@mailbox.org>
 License:     CC-BY-4.0
 Verification: none
@@ -306,10 +306,10 @@ Deliverables must be produced in the following order:
 | source | required | `main.go` or `cmd/<n>/main.go`, `go.mod` | Single file preferred for tools under 1000 lines. Multi-package layout for larger tools. Translator documents choice in translation report. |
 | build | required | `Makefile` | Must include: `build`, `test`, `install`, `clean` targets. `build` target must set `CGO_ENABLED=0` for Go, `-static` for C/C++. |
 | docs | required | `README.md` | Must document: installation via OBS (zypper, apt, dnf), usage, flags, exit codes. Must not document curl-based installation. |
-| license | required | `LICENSE` | Full license text matching the SPDX identifier declared in spec META. |
+| license | required | `LICENSE` | SPDX identifier from spec META + authoritative URL to the full license text. Never reproduce the full license text. |
 | RPM | required | `<n>.spec` | OBS RPM spec file. Must include: Name, Version, License (SPDX), Summary, BuildRequires, %build, %install, %files sections. |
 | DEB | required | `debian/control`, `debian/changelog`, `debian/rules`, `debian/copyright` | Standard Debian source package layout. `debian/copyright` must use DEP-5 machine-readable format with SPDX license identifier. |
-| OCI | supported | `Containerfile` | OCI-compliant container build file. Named `Containerfile` not `Dockerfile`. Multi-stage build required. Final stage must be `FROM scratch` or distroless. Must not expose ports unless spec DEPLOYMENT declares them. |
+| OCI | supported | `Containerfile` | OCI-compliant container build file. Named `Containerfile` not `Dockerfile`. Multi-stage build required. Builder stage: `FROM registry.suse.com/bci/golang:latest AS builder` for Go — never unqualified names (supply chain security requirement). Final stage: `FROM scratch`. Must not expose ports unless spec DEPLOYMENT declares them. |
 | PKG | supported | `<n>.pkgbuild` | macOS installer package descriptor. Required when PLATFORM includes macOS. Minimal skeleton acceptable; document in translation report. |
 | binary | supported | none | Raw binary only. No packaging descriptor required. |
 | report | required | `TRANSLATION_REPORT.md` | AI translator self-evaluation. Must be Markdown. Must include: language resolution rationale, delivery mode, template constraints compliance table, ambiguities, deviations, per-example confidence levels with reasoning, parsing approach, signal handling approach. Written last after all other files verified on disk. |
@@ -336,7 +336,12 @@ in the specification title (first `#` heading). It must be:
 
 **Containerfile:**
 - Must use multi-stage build: builder stage + minimal final stage
-- Final stage must be `FROM scratch` or a distroless base
+- Builder stage must use `FROM registry.suse.com/bci/golang:latest AS builder`
+  for Go. Never use unqualified names such as `golang:1.24` or `docker.io/golang`.
+  This is a supply chain security requirement, not a preference.
+- Final stage must be `FROM scratch` (static binary; no runtime dependencies)
+- Layer order in builder stage: `COPY go.mod go.sum ./` → `RUN go mod download`
+  → `COPY . .` → `RUN CGO_ENABLED=0 go build`
 - Must not expose any ports unless the spec DEPLOYMENT section declares them
 - Must not include a package manager in the final image
 

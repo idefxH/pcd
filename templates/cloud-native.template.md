@@ -4,8 +4,8 @@
 
 ## META
 Deployment:  template
-Version:     0.3.14
-Spec-Schema: 0.3.14
+Version:     0.3.19
+Spec-Schema: 0.3.19
 Author:      Matthias G. Eckermann <pcd@mailbox.org>
 License:     CC-BY-4.0
 Verification: none
@@ -373,7 +373,7 @@ Deliverables must be produced in the following order:
 | source | required | `main.go`, `go.mod` (Go) or equivalent for other languages | Application source code. Must implement health check endpoints. |
 | container | required | `Containerfile` | OCI-compliant container build file. Multi-stage build required. Must use declared BASE-IMAGE. |
 | docs | required | `README.md` | Must document: deployment to Kubernetes, configuration options, health check endpoints, scaling considerations. |
-| license | required | `LICENSE` | Full license text matching the SPDX identifier declared in spec META. |
+| license | required | `LICENSE` | SPDX identifier from spec META + authoritative URL to the full license text. Never reproduce the full license text. |
 | OCI | required | none beyond container | Primary deliverable is the Containerfile. |
 | MANIFEST | required | `deploy/deployment.yaml`, `deploy/service.yaml`, `deploy/configmap.yaml`, `deploy/networkpolicy.yaml`, `deploy/rbac.yaml` | Core Kubernetes resources in deploy/ directory. Ready for kubectl apply -f deploy/. |
 | HELM | supported | `helm/Chart.yaml`, `helm/values.yaml`, `helm/templates/` | Helm chart structure. templates/ must contain templated versions of Kubernetes manifests. |
