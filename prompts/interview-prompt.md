@@ -269,7 +269,7 @@ Use this structure exactly:
 ## META
 Deployment:   {template — cli-tool | mcp-server | cloud-native | ...}
 Version:      0.1.0
-Spec-Schema:  0.3.15
+Spec-Schema:  0.3.21
 Author:       {name <email>}
 License:      {SPDX identifier}
 Verification: {none | lean4 | fstar | dafny | custom}
@@ -334,20 +334,123 @@ ERRORS:
 
 ---
 
-### PHASE 9 — Self-check before presenting
+### PHASE 9 — Milestone design
+
+After writing the specification, count the number of BEHAVIOR blocks.
+
+**If there are 10 or fewer BEHAVIORs:**
+Ask: "This specification has {N} operations. That is small enough to translate
+in a single pass. Do you want to add milestones anyway — for example, to deliver
+a working subset first?"
+
+- If yes: proceed with milestone design below.
+- If no: skip to Phase 10.
+
+**If there are more than 10 BEHAVIORs:**
+Say: "This specification has {N} operations. That is large enough that I
+recommend splitting the translation into milestones so each pass fits
+comfortably within the translator's context window."
+
+Then proceed with milestone design:
+
+**Step 1 — Propose groupings**
+
+Group the BEHAVIORs into logical batches. Aim for 3–8 BEHAVIORs per
+milestone after the scaffold. Present the proposed groupings:
+
+"Here is how I propose to group the operations into milestones:
+
+- **Milestone 0.0.0 — Scaffold** (all {N} operations as stubs, compile gate only)
+- **Milestone 0.1.0** — {group A: names} — {one sentence rationale}
+- **Milestone 0.2.0** — {group B: names} — {one sentence rationale}
+- ...
+
+Does this grouping make sense, or would you like to change it?"
+
+Wait for confirmation before writing the milestones.
+
+**Step 2 — Write acceptance criteria**
+
+For the scaffold milestone:
+```
+Acceptance criteria:
+  ./{binary} --version | grep -q "^{binary} "
+  ./{binary} --help | grep -q "usage:"
+```
+
+For each subsequent milestone, propose concrete observable checks based on
+what the included BEHAVIORs produce. Prefer:
+- File existence checks: `test -s /tmp/out/result.json`
+- JSON field checks: `jq '.field | length > 0' /tmp/out/result.json | grep -q true`
+- Output content checks: `./{binary} {cmd} | grep -q "expected"`
+
+**Step 3 — Identify a hints file**
+
+If the component is large and the deployment type has a milestones hints file,
+reference it in the scaffold milestone:
+
+"The `{template}.{language}.milestones.hints.md` hints file contains
+scaffold patterns for this deployment type. I will add it to the scaffold
+milestone's Hints-file: field."
+
+**Step 4 — Append the MILESTONE sections**
+
+Add all milestone sections at the end of the specification, in order:
+
+```markdown
+## MILESTONE: 0.0.0
+Status: pending
+Scaffold: true
+Hints-file: {template}.{language}.milestones.hints.md
+
+Included BEHAVIORs:
+  {all BEHAVIOR names, comma-separated}
+
+Acceptance criteria:
+  ./{binary} --version | grep -q "^{binary} "
+  ./{binary} --help | grep -q "usage:"
+
+## MILESTONE: 0.1.0
+Status: pending
+
+Included BEHAVIORs:
+  {group A names}
+
+Deferred BEHAVIORs:
+  {all other names}
+
+Acceptance criteria:
+  {observable checks for group A outputs}
+
+{...repeat for each subsequent milestone}
+```
+
+PHASE 9 SUMMARY: Present the complete milestone chain and ask "Is this correct?"
+before proceeding.
+
+---
+
+### PHASE 10 — Self-check before presenting
 
 Before showing the specification to the expert, verify:
 
 - [ ] META section has all 7 required fields
+- [ ] Spec-Schema is 0.3.21
 - [ ] Every BEHAVIOR block has INPUTS, PRECONDITIONS, STEPS, POSTCONDITIONS, and ERRORS
 - [ ] Every STEP has an explicit "on failure" exit
 - [ ] Every INVARIANT is annotated [observable] or [implementation]
 - [ ] Every EXAMPLE has GIVEN, at least one WHEN, and at least one THEN
 - [ ] Multi-step operations have multi-pass WHEN/THEN examples
+- [ ] Every BEHAVIOR with error exits has at least one negative-path EXAMPLE
 - [ ] INTERFACES section is present if external systems were identified
 - [ ] DEPENDENCIES section is present if libraries were identified
-- [ ] No programming language names appear in TYPES, BEHAVIOR, or EXAMPLES
+- [ ] No programming language names appear in TYPES, BEHAVIOR STEPS, or EXAMPLES
 - [ ] No concrete filenames or file paths appear in TYPES or BEHAVIOR
+- [ ] No language-specific function calls appear in STEPS (use abstract operations)
+- [ ] MILESTONE sections present if milestone design was done (Phase 9)
+- [ ] If milestones present: scaffold milestone is first and has Scaffold: true
+- [ ] If milestones present: every BEHAVIOR name in milestones exists in spec
+- [ ] If milestones present: all milestone acceptance criteria are shell commands
 - [ ] No contradictions remain unresolved
 
 If any check fails, fix it before presenting.
@@ -412,7 +515,9 @@ Is this correct?
 
 **Expert:** Yes.
 
-*[Interview continues through Phases 2–7, then Phase 8 produces the spec.]*
+*[Interview continues through Phases 2–7, then Phase 8 produces the spec.
+Phase 9: only 3 BEHAVIORs, so the assistant asks whether milestones are
+wanted and the expert declines. Phase 10 self-check passes.]*
 
 ---
 
@@ -468,7 +573,9 @@ as a daemon. Author is Kenji Tanaka.
 does the folder path need to meet any rules? For example, must it exist
 before the tool starts, or will the tool create it?
 
-*[Gap-fill continues with one question at a time for each [?] item.]*
+*[Gap-fill continues with one question at a time for each [?] item.
+After Phase 8 produces the spec, Phase 9 finds 4 BEHAVIORs — small enough
+to skip milestones, so the assistant asks and the expert declines.]*
 
 ---
 

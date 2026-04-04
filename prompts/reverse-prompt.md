@@ -78,6 +78,10 @@ Build a partial spec skeleton by extracting:
 
 If the evidence points to more than one type, note both and ask in Phase 2.
 
+Also count the number of distinct operations (exported functions, subcommands,
+endpoints). Record this count — it determines whether milestones are warranted
+in Phase 5.
+
 ---
 
 ## PHASE 2 — Confirm identity and intent
@@ -170,10 +174,10 @@ Use this structure exactly:
 
 Deployment:   {confirmed deployment type — never "enhance-existing"}
 Version:      {version from source, or 0.1.0 if not found}
-Spec-Schema:  0.3.20
+Spec-Schema:  0.3.21
 Author:       {extracted from source — unchanged}
 License:      {extracted from source — unchanged}
-Verification: {none | lean4 | fstar | dafny | custom — from Q1.7 or default none}
+Verification: {none | lean4 | fstar | dafny | custom — default none}
 Safety-Level: {from source or confirmed — default QM}
 
 ## TYPES
@@ -244,11 +248,121 @@ is removed and the BEHAVIOR sections are updated to reflect the new state.
 
 ---
 
-## PHASE 5 — Self-check before presenting
+## PHASE 5 — Milestone design
+
+After writing the specification, count the number of BEHAVIOR blocks.
+
+**If there are 10 or fewer BEHAVIORs:**
+Ask: "This specification has {N} operations. That is small enough to translate
+in a single pass. Do you want to add milestones anyway — for example, to deliver
+a working subset first?"
+
+- If yes: proceed with milestone design below.
+- If no: skip to Phase 6.
+
+**If there are more than 10 BEHAVIORs:**
+Say: "This specification has {N} operations. That is large enough that I
+recommend splitting the translation into milestones so each pass fits
+comfortably within the translator's context window."
+
+Then proceed with milestone design:
+
+**Step 1 — Propose groupings**
+
+Group the BEHAVIORs into logical batches. Consider:
+- Which operations are core and must work first?
+- Which operations depend on others being complete?
+- Which are independent and can be deferred?
+
+Aim for 3–8 BEHAVIORs per milestone after the scaffold. Present the proposed
+groupings:
+
+"Here is how I propose to group the operations into milestones:
+
+- **Milestone 0.0.0 — Scaffold** (all {N} operations as stubs, compile gate only)
+- **Milestone 0.1.0** — {group A: names} — {one sentence rationale}
+- **Milestone 0.2.0** — {group B: names} — {one sentence rationale}
+- ...
+
+Does this grouping make sense, or would you like to change it?"
+
+Wait for confirmation before writing the milestones.
+
+**Step 2 — Write acceptance criteria**
+
+For the scaffold milestone:
+```
+Acceptance criteria:
+  ./{binary} --version | grep -q "^{binary} "
+  ./{binary} --help | grep -q "usage:"
+```
+
+For each subsequent milestone, propose concrete observable checks based on
+what the included BEHAVIORs produce. Prefer:
+- File existence checks: `test -s /tmp/out/result.json`
+- JSON field checks: `jq '.field | length > 0' /tmp/out/result.json | grep -q true`
+- Output content checks: `./{binary} {cmd} | grep -q "expected"`
+
+For components requiring elevated privileges (root, sudo, hardware access):
+- Scaffold criteria must be runnable without privilege
+- Later milestone criteria may require a privileged environment; phrase them
+  so the human verifier knows what to run where
+
+**Step 3 — Identify hints files**
+
+If a `{template}.{language}.milestones.hints.md` file exists for this
+deployment type and language, reference it in the scaffold milestone's
+`Hints-file:` field. This file contains scaffold patterns, stub conventions,
+and compile gate commands validated by prior translation runs.
+
+If a `{component}.implementation.hints.md` file is worth creating to
+capture component-specific knowledge (file groupings, required JSON field
+names, known failure modes from prior runs), note this to the author.
+
+**Step 4 — Append the MILESTONE sections**
+
+Add all milestone sections at the end of the specification, after any
+DELTA section, in order:
+
+```markdown
+## MILESTONE: 0.0.0
+Status: pending
+Scaffold: true
+Hints-file: {template}.{language}.milestones.hints.md
+
+Included BEHAVIORs:
+  {all BEHAVIOR names, comma-separated}
+
+Acceptance criteria:
+  ./{binary} --version | grep -q "^{binary} "
+  ./{binary} --help | grep -q "usage:"
+
+## MILESTONE: 0.1.0
+Status: pending
+
+Included BEHAVIORs:
+  {group A names}
+
+Deferred BEHAVIORs:
+  {all other names}
+
+Acceptance criteria:
+  {observable checks for group A outputs}
+
+{...repeat for each subsequent milestone}
+```
+
+PHASE 5 SUMMARY: Present the complete milestone chain and ask "Is this correct?"
+before proceeding.
+
+---
+
+## PHASE 6 — Self-check before presenting
 
 Before showing the specification, verify:
 
 - [ ] META contains all 7 required fields
+- [ ] Spec-Schema is 0.3.21
 - [ ] License is exactly as found in the source — not invented, not changed
 - [ ] Author(s) are exactly as found in the source — not invented, not changed
 - [ ] Deployment type is a valid PCD deployment type — not "enhance-existing"
@@ -259,8 +373,14 @@ Before showing the specification, verify:
 - [ ] Every BEHAVIOR with error exits has at least one negative-path EXAMPLE
 - [ ] INTERFACES section present if external systems were identified
 - [ ] DEPENDENCIES section present if build system declares dependencies
+- [ ] No language-specific constructs in TYPES, BEHAVIOR STEPS, INTERFACES,
+      INVARIANTS, or MILESTONE acceptance criteria
 - [ ] No invented type names, version strings, or dependency versions
 - [ ] DELTA section present if author requested changes; absent if not
+- [ ] MILESTONE sections present if milestone design was done (Phase 5)
+- [ ] If milestones present: scaffold milestone is first and has Scaffold: true
+- [ ] If milestones present: every BEHAVIOR name in milestones exists in spec
+- [ ] If milestones present: acceptance criteria are shell commands (exit 0 = pass)
 - [ ] No contradictions remain unresolved
 
 If any check fails, fix it before presenting.

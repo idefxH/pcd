@@ -1,9 +1,10 @@
+
 # mcp-server-pcd
 
 ## META
 Deployment:        mcp-server
-Version:           0.1.0
-Spec-Schema:       0.3.19
+Version:           0.2.0
+Spec-Schema:       0.3.21
 Author:            Matthias G. Eckermann <pcd@mailbox.org>
 License:           GPL-2.0-only
 Verification:      none
@@ -24,8 +25,13 @@ TemplateVersion := string
 // "latest" resolves to the highest installed version.
 
 HintsKey := string
-// Format: "<template>.<language>.<library>"
-// Example: "cloud-native.go.go-libvirt"
+// Format: "<template>.<language>.<library>" (library-specific hints)
+//      or "<template>.<language>.milestones" (scaffold-first hints)
+//      or "<component>.implementation"       (component-specific hints)
+// Examples:
+//   "cloud-native.go.go-libvirt"
+//   "cli-tool.go.milestones"
+//   "sitar.implementation"
 
 ResourceURI := string
 // Format: "pcd://<type>/<n>"
@@ -33,15 +39,17 @@ ResourceURI := string
 // Examples:
 //   pcd://templates/cli-tool
 //   pcd://prompts/interview
+//   pcd://prompts/reverse
 //   pcd://prompts/translator
 //   pcd://hints/cloud-native.go.go-libvirt
+//   pcd://hints/cli-tool.go.milestones
 
 Diagnostic := {
   severity:  "error" | "warning"
   line:      integer       // 1-based; 1 for file-level diagnostics
   section:   string        // e.g. "META", "BEHAVIOR", "structure"
   message:   string
-  rule:      string        // e.g. "RULE-01", "RULE-08"
+  rule:      string        // e.g. "RULE-01", "RULE-08", "RULE-17"
 }
 
 LintResult := {
@@ -65,6 +73,10 @@ ResourceRecord := {
 }
 
 MilestoneStatus := "pending" | "active" | "failed" | "released"
+// Pipeline state for ## MILESTONE sections.
+// Transitions: pending → active → released (pass) or failed (fail).
+// Exactly one milestone may be active at any time (RULE-15).
+// Status is managed by the agent pipeline, not by the spec author.
 
 SetMilestoneResult := {
   spec_path:        string          // path of the modified spec file
@@ -80,14 +92,16 @@ SetMilestoneResult := {
 
 ```
 Filesystem {
-  // Optional interface — used only when lint_file is called.
-  // Not required for lint_content, resource serving, or tool listing.
+  // Used by lint_file and set_milestone_status.
   required-methods:
-    ReadFile(path) -> (content: string, error)
+    ReadFile(path)              -> (content: string, error)
+    WriteFile(path, content)    -> error
   implementations-required:
     production:  OSFilesystem
     test-double: FakeFilesystem {
-      configurable: Files map[string]string, ReadErr map[string]error
+      configurable: Files map[string]string,
+                    ReadErr map[string]error,
+                    WriteErr map[string]error
     }
 }
 
@@ -158,26 +172,26 @@ AssetStore {
 Constraint: required
 
 INPUTS:
-  none
+```
+none
+```
 
 PRECONDITIONS:
-  - AssetStore is reachable
+- AssetStore is initialised
 
 STEPS:
-  1. Call AssetStore.ListTemplates().
-     On failure: return MCP error -32603 with store error message.
-  2. Return the list as a JSON array of TemplateRecord objects,
-     omitting the content field.
-     MECHANISM: content is omitted from list results to keep
-     response size small; callers use get_template to fetch content.
+1. Call AssetStore.ListTemplates(); on error → MCP error -32603.
+2. For each template record, omit the content field from the response.
+3. Return the list of records.
+   MECHANISM: content is excluded from list responses to keep response size small;
+   callers use get_template to fetch content.
 
 POSTCONDITIONS:
-  - Response contains one entry per installed template.
-  - Each entry has name, version, language fields.
-  - content field is absent from each entry.
+- response contains one entry per installed template
+- each entry has name, version, language; content is absent
 
 ERRORS:
-  - -32603  AssetStore unreachable or read error
+- MCP error -32603 on AssetStore failure
 
 ---
 
@@ -185,28 +199,24 @@ ERRORS:
 Constraint: required
 
 INPUTS:
-  name:     TemplateName
-  version:  TemplateVersion   // default: "latest"
+```
+name:    TemplateName
+version: TemplateVersion   // default: "latest"
+```
 
 PRECONDITIONS:
-  - name is a non-empty string
-  - version is "latest" or a valid semantic version
+- name is non-empty
 
 STEPS:
-  1. Call AssetStore.GetTemplate(name, version).
-     On TemplateNotFound: return MCP error -32602,
-       message "unknown template: {name}".
-     On VersionNotFound: return MCP error -32602,
-       message "version {version} not found for template {name}".
-     On other error: return MCP error -32603.
-  2. Return the full TemplateRecord including content.
+1. Call AssetStore.GetTemplate(name, version); on not found →
+   MCP error -32602 with message "unknown template: {name}".
+2. Return the full TemplateRecord including content.
 
 POSTCONDITIONS:
-  - Response contains name, version, language, and full content.
+- response contains name, version, language, and full Markdown content
 
 ERRORS:
-  - -32602  Unknown template name or version
-  - -32603  Store read error
+- MCP error -32602 if template name is unknown
 
 ---
 
@@ -214,29 +224,25 @@ ERRORS:
 Constraint: required
 
 INPUTS:
-  none
-
-PRECONDITIONS:
-  - AssetStore is reachable
+```
+none
+```
 
 STEPS:
-  1. Call AssetStore.ListTemplates() to enumerate template URIs.
-     On failure: record error, continue with empty template list.
-  2. Call AssetStore.ListPrompts() to enumerate prompt URIs.
-  3. Call AssetStore.ListHintsKeys() to enumerate hints URIs.
-  4. Assemble ResourceRecord list with URIs in format:
-       pcd://templates/<n>
-       pcd://prompts/<n>
-       pcd://hints/<key>
-  5. Return list.
+1. Call AssetStore.ListTemplates(), AssetStore.ListHintsKeys(),
+   AssetStore.ListPrompts() in any order; on error → MCP error -32603.
+2. Construct ResourceRecord list:
+   - templates: uri = "pcd://templates/{name}"
+   - hints:     uri = "pcd://hints/{key}"
+   - prompts:   uri = "pcd://prompts/{name}"
+3. Return the combined list.
 
 POSTCONDITIONS:
-  - All embedded templates, prompts, and hints are represented.
-  - Filesystem overlay entries are included if present.
-  - Each entry has uri and name. content is absent.
+- all installed templates, hints files, and prompts are represented
+- each entry has uri and name; content is absent
 
 ERRORS:
-  - Partial results returned if AssetStore fails for one asset type.
+- MCP error -32603 on AssetStore failure
 
 ---
 
@@ -244,69 +250,65 @@ ERRORS:
 Constraint: required
 
 INPUTS:
-  uri:  ResourceURI
+```
+uri: ResourceURI
+```
 
 PRECONDITIONS:
-  - uri is a non-empty string
-  - uri matches "pcd://<type>/<n>" where type is one of:
-    templates, prompts, hints
+- uri matches pattern "pcd://<type>/<n>"
 
 STEPS:
-  1. Parse uri into type and name components.
-     On parse failure: return MCP error -32602,
-       message "invalid resource URI: {uri}".
-  2. Dispatch by type:
-     - "templates": call AssetStore.GetTemplate(name, "latest").
-       On TemplateNotFound: return MCP error -32602,
-         message "resource not found: {uri}".
-     - "prompts": call AssetStore.GetPrompt(name).
-       On not found: return MCP error -32602,
-         message "resource not found: {uri}".
-     - "hints": call AssetStore.GetHints(name).
-       On not found: return MCP error -32602,
-         message "resource not found: {uri}".
-     - unknown type: return MCP error -32602,
-         message "unknown resource type: {type}".
-  3. Return ResourceRecord with uri, name, and content.
+1. Parse uri; if format does not match "pcd://<type>/<n>" →
+   MCP error -32602 with message "invalid resource URI: {uri}".
+2. Dispatch by type:
+   - "templates": call AssetStore.GetTemplate(n, "latest")
+   - "hints":     call AssetStore.GetHints(n)
+   - "prompts":   call AssetStore.GetPrompt(n)
+   On unknown type → MCP error -32602.
+3. On not found → MCP error -32602 with message "resource not found: {uri}".
+4. Return ResourceRecord with uri, name, and full content.
 
 POSTCONDITIONS:
-  - Response contains full content of the requested resource.
+- response contains uri, name, and full Markdown content
 
 ERRORS:
-  - -32602  URI parse error, unknown type, or resource not found
-  - -32603  Store read error
+- MCP error -32602 for invalid URI format
+- MCP error -32602 for unknown resource type
+- MCP error -32602 for resource not found
 
 ---
 
 ## BEHAVIOR: lint_content
 Constraint: required
 
+Validates a PCD specification given as a string. Applies all rules
+RULE-01 through RULE-17, identical to the pcd-lint CLI.
+
 INPUTS:
-  content:   string    // full Markdown text of the spec
-  filename:  string    // used for diagnostic line references; default "spec.md"
+```
+content:  string    // full spec Markdown text
+filename: string    // used for diagnostics; must have .md extension
+```
 
 PRECONDITIONS:
-  - content is a non-empty string
-  - filename has .md extension or is empty (default applied)
+- content is non-empty
+- filename has .md extension
 
 STEPS:
-  1. If filename is empty, set filename to "spec.md".
-  2. If filename does not end in ".md": return MCP error -32602,
-       message "filename must have .md extension".
-  3. Run all pcd-lint rules (RULE-01 through RULE-14) against content.
-     MECHANISM: identical rule set and logic to the pcd-lint CLI;
-     no network calls; no filesystem access; pure in-memory validation.
-  4. Assemble LintResult with valid, errors, warnings, diagnostics.
-  5. Return LintResult as JSON.
+1. If filename does not end in ".md" →
+   MCP error -32602 with message "filename must have .md extension: {filename}".
+2. Run the embedded lint engine on content with filename.
+   The lint engine applies RULE-01 through RULE-17 in order.
+   All rules run regardless of earlier failures.
+3. Return LintResult.
 
 POSTCONDITIONS:
-  - valid = true iff errors = 0.
-  - Every Diagnostic has severity, line, section, message, rule.
-  - Line numbers are 1-based relative to content.
-  - Result is identical to running: pcd-lint <file> on the same content.
+- result.valid = true iff result.errors = 0
+- result.diagnostics contains one entry per rule violation
+- result is identical to pcd-lint CLI output for the same input
 
 ERRORS:
-  - -32602  filename missing .md extension
+- MCP error -32602 if filename does not have .md extension
 
 ---
 
@@ -314,30 +316,21 @@ ERRORS:
 Constraint: required
 
 INPUTS:
-  path:    string    // absolute or relative filesystem path to a .md file
-
-PRECONDITIONS:
-  - path is a non-empty string
-  - Filesystem is accessible
+```
+path: string    // absolute path to spec file on disk
+```
 
 STEPS:
-  1. If path does not end in ".md": return MCP error -32602,
-       message "file must have .md extension: {path}".
-  2. Call Filesystem.ReadFile(path).
-     On file-not-found: return MCP error -32602,
-       message "cannot open file: {path}".
-     On read error: return MCP error -32603,
-       message "read error: {path}: {error}".
-  3. Run lint_content(content, basename(path)).
-  4. Return LintResult.
+1. Read file via Filesystem.ReadFile(path); on error →
+   MCP error -32602 with message "cannot open file: {path}".
+2. Extract filename = basename(path).
+3. Run lint_content(content, filename).
 
 POSTCONDITIONS:
-  - Same as lint_content postconditions.
-  - Filesystem is never modified.
+- Same as lint_content postconditions.
 
 ERRORS:
-  - -32602  Missing .md extension, file not found
-  - -32603  Filesystem read error
+- MCP error -32602 if file not found or not readable
 
 ---
 
@@ -345,18 +338,18 @@ ERRORS:
 Constraint: required
 
 INPUTS:
-  none
+```
+none
+```
 
 STEPS:
-  1. Return the Spec-Schema version this server was built against
-     as a plain string.
-     MECHANISM: value is compiled in as a constant; no runtime lookup.
+1. Return the Spec-Schema version this binary was built against.
 
 POSTCONDITIONS:
-  - Response is a semantic version string, e.g. "0.3.19".
+- response is a semantic version string (e.g. "0.3.21")
 
 ERRORS:
-  none
+none
 
 ---
 
@@ -381,14 +374,16 @@ PRECONDITIONS:
 - new_status is a valid MilestoneStatus value
 
 STEPS:
-1. Read spec_path from disk via Filesystem.ReadFile; on error → MCP error -32602.
+1. Read spec_path from disk via Filesystem.ReadFile; on error →
+   MCP error -32602 with message "cannot open file: {spec_path}".
 2. Locate the `## MILESTONE: {milestone_name}` section; on not found →
-   MCP error -32602 with message "MILESTONE '{milestone_name}' not found in {spec_path}".
+   MCP error -32602 with message
+   "MILESTONE '{milestone_name}' not found in {spec_path}".
 3. If new_status = "active": scan all other MILESTONE sections in the file.
    If any other section already has `Status: active` →
    MCP error -32602 with message
-   "Cannot set MILESTONE '{milestone_name}' to active: MILESTONE '{other}' is
-    already active. Set it to released or failed first."
+   "Cannot set MILESTONE '{milestone_name}' to active: MILESTONE '{other}'
+    is already active. Set it to released or failed first."
 4. Record previous_status (current Status: value, or "pending" if absent).
 5. Replace or insert the `Status: {value}` line within the located MILESTONE section.
    MECHANISM: the Status: line must be the first non-blank line after the
@@ -471,11 +466,11 @@ ERRORS:
 
 ## POSTCONDITIONS
 
-- Server never modifies any file on disk.
+- Server never modifies any file on disk except via set_milestone_status.
 - Server never makes outbound network calls.
 - Server never reads environment variables for behaviour control.
 - lint_content and lint_file produce identical output to pcd-lint CLI
-  for identical input.
+  for identical input, including RULE-01 through RULE-17.
 - All MCP responses are valid JSON-RPC 2.0.
 
 ---
@@ -484,13 +479,14 @@ ERRORS:
 
 - [observable]      stdio transport: stdout contains only MCP JSON-RPC messages
 - [observable]      lint_content result is identical to pcd-lint CLI on same input
+                    for RULE-01 through RULE-17
 - [observable]      set_milestone_status never modifies any content in the spec
                     other than the Status: line of the named milestone
 - [observable]      set_milestone_status with new_status=active fails if any other
                     milestone already has Status: active in the same file
 - [observable]      server is idempotent: same request always returns same response
 - [observable]      server never exits with code other than 0, 1, or 2
-- [implementation]  rule execution order: RULE-01 through RULE-14, same as pcd-lint
+- [implementation]  rule execution order: RULE-01 through RULE-17, same as pcd-lint
 - [implementation]  resource URIs follow pcd://<type>/<n> scheme exactly
 - [implementation]  all assets (templates, hints, prompts) are embedded into the
                     binary at build time using a single unified asset embedding
@@ -508,7 +504,7 @@ ERRORS:
 
 EXAMPLE: list_templates_returns_names
 GIVEN:
-  AssetStore contains cli-tool@0.3.19 and mcp-server@0.3.19
+  AssetStore contains cli-tool@0.3.21 and mcp-server@0.3.21
 WHEN:
   tool list_templates called with no arguments
 THEN:
@@ -518,11 +514,11 @@ THEN:
 
 EXAMPLE: get_template_cli_tool
 GIVEN:
-  AssetStore contains cli-tool@0.3.19
+  AssetStore contains cli-tool@0.3.21
 WHEN:
   tool get_template called with name="cli-tool" version="latest"
 THEN:
-  response contains name="cli-tool" version="0.3.19"
+  response contains name="cli-tool" version="0.3.21"
   response contains full template Markdown in content field
 
 EXAMPLE: get_template_unknown
@@ -542,6 +538,24 @@ WHEN:
 THEN:
   response contains uri="pcd://prompts/interview"
   response contains full interview prompt Markdown in content field
+
+EXAMPLE: read_resource_reverse_prompt
+GIVEN:
+  AssetStore contains prompt named "reverse"
+WHEN:
+  tool read_resource called with uri="pcd://prompts/reverse"
+THEN:
+  response contains uri="pcd://prompts/reverse"
+  response contains full reverse prompt Markdown in content field
+
+EXAMPLE: read_resource_milestones_hints
+GIVEN:
+  AssetStore contains hints file with key "cli-tool.go.milestones"
+WHEN:
+  tool read_resource called with uri="pcd://hints/cli-tool.go.milestones"
+THEN:
+  response contains uri="pcd://hints/cli-tool.go.milestones"
+  response contains full hints file Markdown in content field
 
 EXAMPLE: read_resource_invalid_uri
 GIVEN:
@@ -572,6 +586,31 @@ THEN:
   result.errors >= 1
   one diagnostic has rule="RULE-01" severity="error"
   diagnostic message contains "INVARIANTS"
+
+EXAMPLE: lint_content_milestone_scaffold_not_first
+GIVEN:
+  content is a PCD spec with two MILESTONE sections:
+    ## MILESTONE: 0.1.0  (no Scaffold field)
+    ## MILESTONE: 0.0.0  Scaffold: true
+  the scaffold milestone appears second in document order
+WHEN:
+  tool lint_content called with that content and filename="myspec.md"
+THEN:
+  result.valid = false
+  result.errors >= 1
+  one diagnostic has rule="RULE-17"
+  diagnostic message contains "must appear first"
+
+EXAMPLE: lint_content_two_scaffold_milestones
+GIVEN:
+  content is a PCD spec with two MILESTONE sections both having Scaffold: true
+WHEN:
+  tool lint_content called with that content and filename="myspec.md"
+THEN:
+  result.valid = false
+  result.errors >= 1
+  one diagnostic has rule="RULE-17"
+  diagnostic message contains "more than one MILESTONE has Scaffold: true"
 
 EXAMPLE: lint_content_bad_extension
 GIVEN:
@@ -639,8 +678,6 @@ WHEN:
 THEN:
   response contains all templates shipped with the binary
   server does not error or exit
-
----
 
 EXAMPLE: set_milestone_active
 GIVEN:
@@ -719,13 +756,16 @@ EMBED-ASSETS:
   - type: hints
     source: repo-root/hints/*.hints.md
     key-derivation: filename stem before ".hints.md"
-      // e.g. "python-tool.hints.md" -> key "python-tool"
+      // e.g. "cli-tool.go.milestones.hints.md" -> key "cli-tool.go.milestones"
+      // e.g. "sitar.implementation.hints.md"   -> key "sitar.implementation"
+      // e.g. "python-tool.hints.md"            -> key "python-tool"
 
   - type: prompts
     source: repo-root/prompts/*.md
     key-derivation: filename stem before ".md"
       // e.g. "interview-prompt.md" -> key "interview"
-      // e.g. "translator.md"       -> key "translator"
+      // e.g. "reverse-prompt.md"  -> key "reverse"
+      // e.g. "prompt.md"          -> key "translator"
 ```
 
 ---
@@ -748,9 +788,11 @@ COMPONENT: implementation
   files: main.go, internal/lint/*.go, internal/store/*.go, internal/milestone/*.go
   notes: >
     Split into packages: main (transport wiring), internal/lint
-    (rule engine, shared with pcd-lint), internal/store (unified
-    AssetStore — templates, hints, prompts). Reuse lint rule logic
-    from pcd-lint if available as a library; otherwise inline.
+    (rule engine applying RULE-01 through RULE-17, shared with pcd-lint),
+    internal/store (unified AssetStore — templates, hints, prompts),
+    internal/milestone (set_milestone_status file editing logic).
+    Reuse lint rule logic from pcd-lint if available as a library;
+    otherwise inline. The lint engine must implement all 17 rules.
 
 COMPONENT: module
   files: go.mod
@@ -778,7 +820,8 @@ COMPONENT: packaging
 COMPONENT: container
   files: Containerfile
   notes: >
-    Multi-stage build. Final stage FROM scratch.
+    Multi-stage build. Builder FROM registry.suse.com/bci/golang:latest.
+    Final stage FROM scratch.
     EXPOSE 8080. ENTRYPOINT defaults to http transport.
 
 COMPONENT: service-unit
@@ -787,6 +830,7 @@ COMPONENT: service-unit
 
 COMPONENT: license
   files: LICENSE
+  notes: GPL-2.0-only — SPDX identifier and URL only, do not reproduce full text.
 
 COMPONENT: tests
   files: independent_tests/INDEPENDENT_TESTS.go
@@ -794,7 +838,8 @@ COMPONENT: tests
     All tests use FakeStore, FakeFilesystem.
     No filesystem access. No network calls. No live pcd-lint binary.
     Must include TestLintMatchesCLI (verifies lint_content invariant).
-    FakeStore replaces FakeTemplateStore and FakePromptStore.
+    Must include TestSetMilestoneStatus (verifies file editing invariants).
+    FakeFilesystem must support both ReadFile and WriteFile.
 
 COMPONENT: documentation
   files: README.md

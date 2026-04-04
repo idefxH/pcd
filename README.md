@@ -86,7 +86,20 @@ RPM · DEB · OCI via OBS"]
 - *Direct path:* Specification → Go/C/Rust — fast iteration, lower assurance
 - *Verified path:* Specification → Lean 4/F*/Dafny → Go/C — formal proofs, highest assurance
 
+**Milestones** enable phased translation for large components. A spec may declare a chain of milestones, each a named subset of BEHAVIORs. A pipeline agent advances the milestone cursor automatically; the human intervenes only on failures.
+
 **Audit bundles** are first-class outputs: specification + generated code + proofs (if any) + translation report + metadata. Designed for regulatory compliance with ISO 26262, DO-178C, IEC 62304, and Common Criteria.
+
+---
+
+## Documentation
+
+| Document | Audience | Location |
+|---|---|---|
+| **User guide** — how to write specs, use milestones, translate to code | Spec authors | [`doc/guide.md`](doc/guide.md) |
+| **Whitepaper** — paradigm, theory, related work | Researchers, decision-makers | [`doc/whitepaper.md`](doc/whitepaper.md) |
+| **Executive brief** — business case, value proposition | Management | [`doc/executive-brief.md`](doc/executive-brief.md) |
+| **Contributing** — how to improve PCD itself | Framework contributors | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 
 ---
 
@@ -108,53 +121,21 @@ running locally without GPU acceleration.
 ollama run llama3.2 "$(cat prompts/interview-prompt.md)"
 ```
 
-**Option B — Write the spec directly**
+**Option B — Reverse-engineer existing code**
 
-Every specification follows this structure:
+Use `prompts/reverse-prompt.md` to produce a spec from an existing codebase.
+The model reads the source, detects the deployment type and language, confirms
+with you, and asks what you want to change. Useful for analysis, refactoring,
+or porting to a new language.
 
-```markdown
-# My Component
+**Option C — Write the spec directly**
 
-## META
-Deployment:   cli-tool
-Version:      0.1.0
-Spec-Schema:  0.3.15
-Author:       Your Name <you@example.org>
-License:      Apache-2.0
-Verification: none
-Safety-Level: QM
+See [`doc/guide.md`](doc/guide.md) for the full specification structure
+reference. Validate with:
 
-## TYPES
-...
-
-## BEHAVIOR: my-operation
-Constraint: required
-INPUTS: ...
-PRECONDITIONS: ...
-STEPS:
-  1. [action]; on failure → [error].
-  2. [next action].
-POSTCONDITIONS: ...
-ERRORS: ...
-
-## INVARIANTS
-- [observable]      ...
-- [implementation]  ...
-
-## EXAMPLES
-
-EXAMPLE: success_case
-GIVEN: ...
-WHEN:  ...
-THEN:  ...
-
-EXAMPLE: error_case
-GIVEN: ...
-WHEN:  ...
-THEN:  result = Err(...)
+```bash
+pcd-lint myspec.md
 ```
-
-Validate with `pcd-lint myspec.md` before proceeding.
 
 ---
 
@@ -165,6 +146,7 @@ Use the standard translator prompt from `prompts/prompt.md` with any capable LLM
 - Derive the target language from the deployment template — never declared in the spec
 - Produce all required deliverables from the template's DELIVERABLES section
 - Write a `TRANSLATION_REPORT.md` documenting every decision and confidence level
+- For large specs: check for an active milestone and translate only that milestone's BEHAVIORs
 
 ---
 
@@ -191,6 +173,7 @@ The LLM resolved Go as the target language from the template without being told.
 | `lint_content` | Validate a spec given as a string — returns structured diagnostics |
 | `lint_file` | Validate a spec file on disk |
 | `get_schema_version` | Return the Spec-Schema version the server was built against |
+| `set_milestone_status` | Advance the milestone cursor in a spec file on disk |
 
 **Resources** (browseable by the LLM natively):
 
@@ -198,8 +181,9 @@ The LLM resolved Go as the target language from the template without being told.
 |---|---|
 | `pcd://templates/{name}` | Full deployment template Markdown |
 | `pcd://prompts/interview` | The interview prompt — guides spec authoring |
+| `pcd://prompts/reverse` | The reverse prompt — reverse-engineers existing code |
 | `pcd://prompts/translator` | The universal translator prompt |
-| `pcd://hints/{template}.{lang}.{lib}` | Library-specific translator hints |
+| `pcd://hints/{template}.{lang}.{lib}` | Translator hints files |
 
 **Usage with mcphost:**
 
@@ -212,7 +196,8 @@ mcpServers:
 
 A connected LLM can then conduct the full PCD workflow in a single session:
 read the interview prompt → interview the domain expert → write the spec →
-call `lint_content` → fix errors → read the template → translate to code.
+call `lint_content` → fix errors → read the template → translate to code →
+advance milestones via `set_milestone_status`.
 
 `mcp-server-pcd` is itself specified in `tools/mcp-server-pcd/spec/mcp-server-pcd.md`
 and generated using PCD. Self-hosting all the way down.
@@ -225,6 +210,11 @@ provider. Every model resolved Go as the target language from the deployment
 template without being told. All implementations passed their compile gates and
 test suites without hand-written code.
 
+A 35-BEHAVIOR, 2900-line specification (sitar — a Linux system information
+collector) was translated to both Go and Rust in single sessions each, using
+the scaffold-first milestone pattern. The scaffold held without modification
+through seven subsequent implementation milestones in both languages.
+
 ---
 
 ## Repository Layout
@@ -234,16 +224,20 @@ pcd/
 ├── README.md
 ├── LICENSE                            ← CC-BY-4.0 (specs, templates, whitepaper)
 ├── LICENSE-tools                      ← GPL-2.0-only (tools/)
-├── CONTRIBUTING.md
+├── CONTRIBUTING.md                    ← for contributors to PCD itself
 │
 ├── doc/
+│   ├── guide.md                       ← user guide for spec authors  ← START HERE
 │   ├── whitepaper.md                  ← canonical whitepaper
 │   └── executive-brief.md             ← business / non-technical summary
 │
 ├── hints/
+│   ├── cli-tool.go.milestones.hints.md
+│   ├── cli-tool.rs.milestones.hints.md
 │   ├── cloud-native.go.go-libvirt.hints.md
 │   ├── cloud-native.go.golang-crypto-ssh.hints.md
-│   └── mcp-server.go.mcp-go.hints.md
+│   ├── mcp-server.go.mcp-go.hints.md
+│   └── python-tool.hints.md
 │
 ├── templates/
 │   ├── cli-tool.template.md
@@ -272,7 +266,8 @@ pcd/
 │
 └── prompts/
     ├── prompt.md                      ← standard translator prompt
-    ├── interview-prompt.md            ← AI-assisted spec authoring
+    ├── interview-prompt.md            ← AI-assisted spec authoring (new components)
+    ├── reverse-prompt.md              ← reverse-engineer existing code to spec
     └── README-small-models.md
 ```
 
@@ -282,7 +277,7 @@ pcd/
 
 | Artifact | License |
 |---|---|
-| Whitepaper, specifications, templates | [CC-BY-4.0](LICENSE) |
+| Whitepaper, specifications, templates, guide | [CC-BY-4.0](LICENSE) |
 | `pcd-lint` and tools | [GPL-2.0-only](LICENSE-tools) |
 
 The CC-BY-4.0 license on specifications and templates means anyone may implement the paradigm — including proprietary translators and commercial tools — provided attribution is given. The GPL-2.0-only license on `pcd-lint` ensures the reference validator remains community-controlled and open.
@@ -291,7 +286,7 @@ The CC-BY-4.0 license on specifications and templates means anyone may implement
 
 ## Status
 
-Current version: **0.3.19** (draft)
+Current version: **0.3.21** (draft)
 
 This project is in active development. The specification format, deployment templates, and tooling are stabilising toward a v1.0 release. Feedback, issue reports, and contributions are welcome.
 
@@ -304,6 +299,3 @@ This project is in active development. The specification format, deployment temp
 ## Author
 
 Matthias G. Eckermann — [pcd@mailbox.org](mailto:pcd@mailbox.org)
-
-
-
