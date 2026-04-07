@@ -3,6 +3,7 @@
 
 
 
+
 # Post-Coding Development
 ## Human Intent, Machine Implementation
 
@@ -2293,6 +2294,114 @@ inference requires GPU acceleration. CPU-only inference is feasible for
 testing and validation only. A 120B model (LLM-E) on GPU-accelerated
 infrastructure at a regional EU provider performed comparably to frontier
 models on deliverable completeness.
+
+### LLM-H: v0.3.21 regeneration runs (2026-04-07)
+
+On 2026-04-07, both `pcd-lint` and `mcp-server-pcd` were regenerated from
+their updated v0.3.21 specifications using Claude Sonnet 4.5 and Claude Haiku.
+This was the first empirical test of the milestone mechanism, RULE-15/16/17,
+and the `set_milestone_status` tool in a real translation run.
+
+#### pcd-lint v0.3.21
+
+Three approaches were tested in parallel: Haiku fresh, Sonnet incremental
+(update existing code), and Sonnet fresh.
+
+| Approach | Model | Result | Rules |
+|---|---|---|---|
+| Fresh translation | Haiku | ✓ compile + self-validate | 13/17 |
+| Incremental update | Sonnet 4.5 | ✗ stalled (output length) | — |
+| Fresh translation | Sonnet 4.5 | ✓ **chosen** | **17/17** |
+
+**Haiku** succeeded on a fresh translation: the binary compiled, passed
+pcd-lint self-validation, and validated a real deployment template. However,
+RULE-10 (negative-path example detection), RULE-11 (TOOLCHAIN-CONSTRAINTS),
+RULE-12 (cross-section consistency), and RULE-16 (MILESTONE BEHAVIOR names)
+were either missing or stub-only. Haiku stayed within the provided input
+files without prompting.
+
+**Sonnet incremental** stalled with max_tokens set to 16384 — the existing
+code plus all new rule implementations exceeded the output window. Raising
+max_tokens to 128000 (the hard API ceiling for Sonnet 4.5/4.6) and disabling
+compaction resolved the stall.
+
+**Sonnet fresh** at 128000 tokens implemented all 17 rules. The key
+architectural decision — extracting the rule engine into `internal/lint/lint.go`
+to allow `mcp-server-pcd` to import it as a library — was made independently
+by both Haiku and Sonnet, converging on the same package structure. Sonnet's
+`internal/lint/lint.go` matches the DELIVERABLES declaration in the spec
+and is importable by external packages; Haiku's `rules.go` in the main
+package is not. Sonnet was chosen.
+
+#### mcp-server-pcd v0.2.0
+
+Tested in two rounds. Round 1: input contained only the spec, one hints file,
+and one template. Round 2: full input set (all 9 templates, all 6 hints files,
+all 3 prompts).
+
+**Round 1 finding:** without the full asset set in the input directory, all
+translators produced placeholder or partial embedded assets. Asset embedding
+is driven by what is present at translation time — the spec cannot substitute
+for missing input files.
+
+**Round 2 results:**
+
+| Approach | Model | Embedded assets | Notes |
+|---|---|---|---|
+| Fresh | Haiku | 4 of 18 | 13 session noise files (COMPLETION_SUMMARY.txt etc.) |
+| Fresh | Sonnet 4.5 | **18 of 18** ✓ | **chosen** |
+| Incremental | Sonnet 4.5 | 0 (placeholders) | Correct module path; logic updated correctly |
+
+**Sonnet fresh** correctly embedded all 18 assets (9 templates, 6 hints
+files, 3 prompts including the new `reverse-prompt.md`). The `set_milestone_status`
+tool and `internal/milestone/` package were implemented correctly. The
+`reverse` prompt resource (`pcd://prompts/reverse`) was registered.
+
+**Haiku** produced a functional binary but embedded only 4 assets — the
+files that happened to be in the input directory at translation time. It
+also generated 13 housekeeping files (`COMPLETION_SUMMARY.txt`,
+`DELIVERY_MANIFEST.txt`, `ENHANCEMENT_REPORT.md`, `START_HERE.md` etc.)
+that are agentic session artefacts, not spec deliverables. These are
+disqualifying for a public repository.
+
+**Sonnet incremental** correctly updated the rule logic and preserved the
+existing module path (`github.com/mge1512/mcp-server-pcd`) but produced
+placeholder assets in both rounds. Fresh translation is required for
+mcp-server-pcd due to the asset staging complexity.
+
+#### Infrastructure findings (2026-04-07)
+
+**max_tokens ceiling.** Sonnet 4.5/4.6 has a hard API limit of 128000 output
+tokens. Requests with max_tokens > 128000 return HTTP 400. For complete
+mcp-server-pcd translations, 128000 tokens is sufficient but tight.
+
+**Filesystem restriction is essential for clean runs.** Sonnet in agentic
+mode will explore the filesystem and read existing code if not constrained.
+Restricting the working directory to `/tmp/` prevented contamination. Haiku
+stayed within the provided input files without prompting.
+
+**No root access constraint.** Sonnet attempted to install Go module
+dependencies via system package manager on the first run. Adding an explicit
+"no root access; use go mod vendor" constraint in the system prompt resolved
+this. All subsequent runs used user-level GOPATH/GOCACHE correctly.
+
+**URL references in system prompt are fetched.** Providing the canonical
+GitHub URL to `pcd-lint/code/internal/lint/lint.go` caused Sonnet to fetch
+and read the live file. This is the correct approach for sharing library
+code between tools without violating Go's `internal/` package import rules.
+
+**Module path is a systematic translator gap.** No translator can determine
+the author's GitHub username from the spec alone. The `Author:` field
+provides an email address but not a repository path. Both Sonnet runs
+produced incorrect module paths (`pcd-tools/pcd-lint`, `mcp-server-pcd`)
+that required a post-generation fix commit. This is a candidate for a new
+META field in a future schema version.
+
+**Commit transparency pattern.** Both tools were pushed with a three-commit
+history: (1) original baseline code, (2) AI-generated translation with
+model credited in the commit message, (3) module path correction. This
+provides full provenance — human-written baseline, AI translation, and
+the single manual correction are all visible and attributable.
 
 ### Overall Assessment
 
