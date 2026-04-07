@@ -21,9 +21,9 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
-	"mcp-server-pcd/internal/lint"
-	"mcp-server-pcd/internal/milestone"
-	"mcp-server-pcd/internal/store"
+	"github.com/mge1512/mcp-server-pcd/internal/lint"
+	"github.com/mge1512/mcp-server-pcd/internal/milestone"
+	"github.com/mge1512/mcp-server-pcd/internal/store"
 )
 
 // serverVersion is set at build time via -ldflags="-X main.serverVersion=..."

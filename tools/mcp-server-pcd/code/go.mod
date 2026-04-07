@@ -1,4 +1,4 @@
-module mcp-server-pcd
+module github.com/mge1512/mcp-server-pcd
 
 go 1.23.0
 

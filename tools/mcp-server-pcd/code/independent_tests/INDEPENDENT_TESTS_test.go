@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"mcp-server-pcd/internal/lint"
-	"mcp-server-pcd/internal/milestone"
-	"mcp-server-pcd/internal/store"
+	"github.com/mge1512/mcp-server-pcd/internal/lint"
+	"github.com/mge1512/mcp-server-pcd/internal/milestone"
+	"github.com/mge1512/mcp-server-pcd/internal/store"
 )
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
