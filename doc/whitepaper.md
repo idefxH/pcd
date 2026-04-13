@@ -5,6 +5,7 @@
 
 
 
+
 # Post-Coding Development
 ## Human Intent, Machine Implementation
 
@@ -3251,6 +3252,127 @@ the translator. This asymmetry should inform the default choice.
 | Incremental update recommended | Read existing `<specname>.<lang>.decisions.hints.md` before starting |
 | Switching target language | Discard `<specname>.<oldlang>.decisions.hints.md`; new file created by first translation run |
 | Clean full regeneration (no prior decisions) | No decisions hints file needed; translator starts clean |
+
+---
+
+## A.20 Spec Hash Embedding — Chain of Custody
+
+### The Problem
+
+A PCD translation run produces multiple artifacts: source files, packaging
+scripts, a Containerfile, a translation report, a binary. Over time, with
+multiple runs, potentially multiple models, and incremental updates, a
+critical question arises: which spec version produced this artifact?
+
+Without a verifiable answer, the audit trail is incomplete. The spec can be
+certified and the code can be verified, but the link between them is asserted
+rather than proved.
+
+### The Solution
+
+Every generated artifact embeds the SHA256 checksum of the spec file it was
+produced from. The hash is computed at translation time from the spec file
+as provided — not from any transformed version — and embedded in every
+deliverable.
+
+This creates a cryptographically verifiable chain of custody:
+
+```
+spec file → sha256sum → hash H
+                            ↓
+           embedded in: source files, binary --version,
+                        RPM .spec, DEB control,
+                        Containerfile LABEL, Makefile,
+                        TRANSLATION_REPORT.md
+```
+
+### Embedding Locations
+
+| Artifact | Embedding format |
+|---|---|
+| Source files (all languages) | Comment near top: `// generated from spec: <name>.md sha256:<H>` |
+| `TRANSLATION_REPORT.md` | Header field: `Spec-SHA256: <H>` |
+| Binary `--version` output | `spec:<H>` included in version string |
+| RPM `.spec` file | `# pcd-spec-sha256: <H>` comment |
+| DEB `control` file | `X-PCD-Spec-SHA256: <H>` field |
+| `Containerfile` | `LABEL pcd.spec.sha256="<H>"` |
+| `Makefile` | `SPEC_SHA256 := <H>` variable |
+
+The comment syntax varies by language; the translator uses the correct syntax
+for the target language in all source files.
+
+### What This Enables
+
+**Audit trail completeness.** Any artifact can be traced back to the exact
+spec that produced it. Running `sha256sum <specname>.md` against the
+current spec and comparing to the embedded hash answers: "is this artifact
+current with the current spec, or was it produced from an older version?"
+
+**Version boundary detection.** When a spec is updated and a new translation
+run is triggered, the new artifacts carry a different hash from the old
+artifacts. The version boundary is cryptographically visible without
+inspecting build logs or commit history.
+
+**Regulated domain compliance.** Common Criteria and ISO 26262 require
+traceability from requirement to implementation. The spec hash provides
+that traceability link in a form that is machine-verifiable, not just
+human-asserted. The chain becomes: certified spec → spec hash → verified
+artifact. The hash is the link that makes the chain auditable by anyone.
+
+**Change impact verification.** The `assess_change_impact` tool (A.19)
+recommends full regeneration or incremental update. After a regeneration
+run, the new spec hash in all artifacts confirms the run was complete —
+no artifact was missed.
+
+**4-eyes principle integration.** When the 4-eyes principle requires that
+code is reviewed by a human before release, the reviewer can verify that
+the artifact they are reviewing was produced from the spec they certified,
+by comparing hashes. No assumption about the build pipeline is required.
+
+**Copyright and ownership clarity.** The spec is the human-authored artifact.
+The spec hash in the generated code makes the provenance of the generated
+code explicit and machine-verifiable. The claim "this code was generated
+from this spec" is no longer an assertion — it is a verifiable fact.
+
+### Verification
+
+To verify that an artifact is current with a spec:
+
+```bash
+sha256sum <specname>.md
+# Compare output to the hash embedded in the artifact
+```
+
+To extract the embedded hash from a binary:
+
+```bash
+<binary> --version   # includes spec:<hash>
+```
+
+To extract from a container image:
+
+```bash
+docker inspect <image> | jq '.[0].Config.Labels["pcd.spec.sha256"]'
+```
+
+### Invariant
+
+> [observable] Every generated artifact embeds the SHA256 of the spec file
+> it was produced from. An artifact without an embedded spec hash is
+> incomplete regardless of whether all other deliverables are present.
+
+### Framework Integration
+
+The spec hash requirement is enforced in `prompts/prompt.md` as a universal
+principle applied to every translation run, independent of template or
+target language. The embedding locations listed above are the minimum set;
+deployment templates may specify additional embedding locations relevant to
+their artifact type.
+
+`pcd-lint` RULE-18 (planned): detect if a spec has been modified since the
+last known translation run by comparing the current spec hash to the hash
+recorded in the most recent `TRANSLATION_REPORT.md` in the adjacent code
+directory. Emit a warning if they differ.
 
 ---
 
