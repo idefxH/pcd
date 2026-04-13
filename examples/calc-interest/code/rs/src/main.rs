@@ -1,6 +1,6 @@
-// generated from spec: calc-interest.spec.md sha256:609312967055ace0ebcd67f538f015496b8b098b0414fc187b94718dd326eac3
+// generated from spec: calc-interest.spec.md sha256:8279a6f935e0a8c1f7e3caa355a553dcb6470960bb2d87b6b4cda99caa48f941
 // calc-interest — simple interest calculator
-// Spec: calc-interest.spec.md v0.1.0
+// Spec: calc-interest.spec.md v0.2.0
 // License: Apache-2.0
 //
 // Reads principal, rate, and periods from stdin (one value per line),
@@ -27,7 +27,19 @@ const RATE_MAX: f64 = 999.9999;
 const PERIODS_MAX: u32 = 999;
 const MONETARY_MAX: f64 = 9_999_999.99;
 
+// ── Version identity (from spec META) ───────────────────────────────────────
+const VERSION: &str = "0.2.0";
+const SPEC_SHA256: &str = "8279a6f935e0a8c1f7e3caa355a553dcb6470960bb2d87b6b4cda99caa48f941";
+
 fn main() {
+    // ── BEHAVIOR: version ────────────────────────────────────────────────────
+    // If first argument is "version", print version line and exit 0.
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && args[1] == "version" {
+        println!("calc-interest {} spec:{}", VERSION, SPEC_SHA256);
+        process::exit(0);
+    }
+
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
 

@@ -1,4 +1,4 @@
-// generated from spec: calc-interest.spec.md sha256:609312967055ace0ebcd67f538f015496b8b098b0414fc187b94718dd326eac3
+// generated from spec: calc-interest.spec.md sha256:8279a6f935e0a8c1f7e3caa355a553dcb6470960bb2d87b6b4cda99caa48f941
 package org.example.calcinterest;
 
 import java.io.BufferedReader;
@@ -18,10 +18,17 @@ import java.math.RoundingMode;
  *   1 — read failure or arithmetic overflow
  *   2 — invalid input value
  *
- * <p>Specification: calc-interest v0.1.0 (Spec-Schema 0.3.21)
+ * <p>Specification: calc-interest v0.2.0 (Spec-Schema 0.3.22)
  * License: Apache-2.0
  */
 public final class Main {
+
+    // -----------------------------------------------------------------------
+    // Version and spec identity
+    // -----------------------------------------------------------------------
+    private static final String VERSION   = "0.2.0";
+    private static final String SPEC_SHA256 =
+            "8279a6f935e0a8c1f7e3caa355a553dcb6470960bb2d87b6b4cda99caa48f941";
 
     // -----------------------------------------------------------------------
     // Domain constraints (from spec TYPES section)
@@ -59,9 +66,12 @@ public final class Main {
     /**
      * Main entry point.
      *
+     * <p>BEHAVIOR: version — if first argument is "version", prints version
+     * and spec hash, then exits 0.
+     *
      * <p>BEHAVIOR: calculate-simple-interest — all STEPS implemented in order.
      *
-     * @param args command-line arguments (not used; tool reads from stdin)
+     * @param args command-line arguments; if args[0] == "version", print version and exit
      */
     public static void main(String[] args) {
         // Install clean-exit signal handlers for SIGTERM and SIGINT
@@ -71,6 +81,13 @@ public final class Main {
             // No partial output cleanup needed here because we write
             // to stdout only after all computation succeeds (step 9-10).
         }));
+
+        // BEHAVIOR: version
+        // STEP 1: if first argument is "version", print version line and exit 0.
+        if (args.length > 0 && "version".equals(args[0])) {
+            System.out.println("calc-interest " + VERSION + " spec:" + SPEC_SHA256);
+            System.exit(EXIT_OK);
+        }
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 

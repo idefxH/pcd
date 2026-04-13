@@ -1,11 +1,11 @@
 # Translation Report: calc-interest — Rust
 
-**Component:** calc-interest v0.1.0  
-**Spec-Schema:** 0.3.21  
+**Component:** calc-interest v0.2.0  
+**Spec-Schema:** 0.3.22  
 **Template:** cli-tool.template v0.3.20  
-**Translation date:** 2026-04-09  
+**Translation date:** 2026-04-13  
 **Translator:** PCD AI Translator (Rust target)  
-**Spec-SHA256:** 609312967055ace0ebcd67f538f015496b8b098b0414fc187b94718dd326eac3
+**Spec-SHA256:** 8279a6f935e0a8c1f7e3caa355a553dcb6470960bb2d87b6b4cda99caa48f941
 
 ---
 
@@ -45,21 +45,24 @@ The template EXECUTION section defines Go-centric phases. These were adapted for
 
 ## 4. STEPS Ordering — BEHAVIOR: calculate-simple-interest
 
-All 11 STEPS were implemented in the exact order specified in the spec:
+All 11 STEPS were implemented in the exact order specified in the spec. The `version` subcommand check is handled before Step 1 (see BEHAVIOR: version in Section 7).
 
 | Step | Spec text | Implementation location |
 |------|-----------|------------------------|
-| 1 | Read principal from stdin; on failure → exit 1, write error to stderr | `src/main.rs` lines ~20–35 |
-| 2 | Read rate from stdin; on failure → exit 1, write error to stderr | `src/main.rs` lines ~37–52 |
-| 3 | Read periods from stdin; on failure → exit 1, write error to stderr | `src/main.rs` lines ~54–69 |
-| 4 | Validate principal > 0; on failure → exit 2, "invalid principal" | `src/main.rs` ~72–75 |
-| 5 | Validate rate > 0; on failure → exit 2, "invalid rate" | `src/main.rs` ~78–81 |
-| 6 | Validate periods >= 1; on failure → exit 2, "invalid periods" | `src/main.rs` ~84–87 |
-| 7 | Compute interest = principal × rate × periods; overflow → exit 1 | `src/main.rs` ~90–94 |
-| 8 | Compute total = principal + interest; overflow → exit 1 | `src/main.rs` ~97–101 |
-| 9 | Write "INTEREST: {interest}" to stdout, 2 d.p. | `src/main.rs` ~104–108 |
-| 10 | Write "TOTAL:    {total}" to stdout, 2 d.p. | `src/main.rs` ~108–112 |
-| 11 | Exit with code 0 | `src/main.rs` ~115 |
+| 0* | If first arg is "version", print version line and exit 0 | `src/main.rs` — before Step 1 (version subcommand) |
+| 1 | Read principal from stdin; on failure → exit 1, write error to stderr | `src/main.rs` lines ~45–60 |
+| 2 | Read rate from stdin; on failure → exit 1, write error to stderr | `src/main.rs` lines ~62–77 |
+| 3 | Read periods from stdin; on failure → exit 1, write error to stderr | `src/main.rs` lines ~79–94 |
+| 4 | Validate principal > 0; on failure → exit 2, "invalid principal" | `src/main.rs` ~97–100 |
+| 5 | Validate rate > 0; on failure → exit 2, "invalid rate" | `src/main.rs` ~103–106 |
+| 6 | Validate periods >= 1; on failure → exit 2, "invalid periods" | `src/main.rs` ~109–112 |
+| 7 | Compute interest = principal × rate × periods; overflow → exit 1 | `src/main.rs` ~115–119 |
+| 8 | Compute total = principal + interest; overflow → exit 1 | `src/main.rs` ~122–126 |
+| 9 | Write "INTEREST: {interest}" to stdout, 2 d.p. | `src/main.rs` ~129–133 |
+| 10 | Write "TOTAL:    {total}" to stdout, 2 d.p. | `src/main.rs` ~133–137 |
+| 11 | Exit with code 0 | `src/main.rs` ~140 |
+
+\* Step 0 is not a spec STEP number; it denotes the version subcommand guard added in v0.2.0.
 
 ---
 
@@ -91,6 +94,7 @@ The template does not contain a `## GENERATED-FILE-BINDINGS` section. No generat
 | BEHAVIOR | Constraint | Action taken |
 |----------|------------|-------------|
 | calculate-simple-interest | required | Fully implemented |
+| version | required | Fully implemented (v0.2.0): `args[1] == "version"` guard at top of `main()` prints `"calc-interest 0.2.0 spec:{sha256}"` and exits 0 |
 
 No `supported` or `forbidden` BEHAVIORs are present in the spec.
 
@@ -151,8 +155,8 @@ No `## MILESTONE:` sections are present in the spec. Full translation was perfor
 
 | Constraint key | Required | Compliant | Notes |
 |----------------|----------|-----------|-------|
-| VERSION | required | ✓ | 0.1.0 in Cargo.toml and RPM spec |
-| SPEC-SCHEMA | required | ✓ | 0.3.21 (from spec) |
+| VERSION | required | ✓ | 0.2.0 in Cargo.toml and RPM spec |
+| SPEC-SCHEMA | required | ✓ | 0.3.22 (from spec) |
 | AUTHOR | required | ✓ | Unknown (as in spec) |
 | LICENSE | required | ✓ | Apache-2.0 SPDX in all packaging files |
 | LANGUAGE | default=Go, used=Rust | ✓ | Rust is a valid supported alternative |
@@ -185,7 +189,7 @@ No `## MILESTONE:` sections are present in the spec. Full translation was perfor
 |------|---------|--------|
 | Dependency resolution | `cargo build --release` (no external deps; no `go mod tidy` equivalent needed) | ✓ PASS |
 | Compilation | `cargo build --release` | ✓ PASS — `Finished release profile` |
-| Integration tests | `cargo test --release` | ✓ PASS — 5/5 tests passed |
+| Integration tests | `cargo test --release` | ✓ PASS — 6/6 tests passed |
 | Man page generation | `pandoc calc-interest.1.md -s -t man -o calc-interest.1` | ✓ PASS |
 
 Build artefacts (`target/`) were cleaned after the compile gate (`cargo clean`).
@@ -201,8 +205,9 @@ Build artefacts (`target/`) were cleaned after the compile gate (`cargo clean`).
 | zero_principal_rejected | **High** | `test_zero_principal_rejected` in `tests/independent_tests.rs` — passes without any external service | None |
 | zero_periods_rejected | **High** | `test_zero_periods_rejected` in `tests/independent_tests.rs` — passes without any external service | None |
 | non_numeric_input_rejected | **High** | `test_non_numeric_input_rejected` in `tests/independent_tests.rs` — passes without any external service | None |
+| version_output | **High** | `test_version_output` in `tests/independent_tests.rs` — passes without any external service | None |
 
-All 5 spec examples achieve **High** confidence. Every example has a dedicated named test function that was executed and passed during the compile gate (Phase 5).
+All 6 spec examples achieve **High** confidence. Every example has a dedicated named test function that was executed and passed during the compile gate (Phase 5).
 
 ---
 

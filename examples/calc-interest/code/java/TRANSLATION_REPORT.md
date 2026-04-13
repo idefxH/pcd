@@ -1,11 +1,11 @@
 # TRANSLATION REPORT
 
 **Component:** calc-interest  
-**Spec version:** 0.1.0 (Spec-Schema 0.3.21)  
+**Spec version:** 0.2.0 (Spec-Schema 0.3.22)  
 **Template:** cli-tool.template.md v0.3.20  
-**Translation date:** 2026-04-09  
+**Translation date:** 2026-04-13  
 **Target language:** Java 17  
-**Spec-SHA256:** 609312967055ace0ebcd67f538f015496b8b098b0414fc187b94718dd326eac3  
+**Spec-SHA256:** 8279a6f935e0a8c1f7e3caa355a553dcb6470960bb2d87b6b4cda99caa48f941  
 
 ---
 
@@ -132,6 +132,12 @@ Upper-bound validation (Principal ≤ 9999999.99, Rate ≤ 999.9999, Periods ≤
 is included in steps 4–6 as conservative interpretation of the TYPES constraints,
 even though the spec's STEPS only mention lower-bound checks.
 
+### BEHAVIOR: version (Constraint: required) — added in v0.2.0
+
+Implemented at the top of `main()`, before stdin reading. If `args[0]` equals
+`"version"`, prints `"calc-interest 0.2.0 spec:8279a6f935e0a8c1f7e3caa355a553dcb6470960bb2d87b6b4cda99caa48f941"`
+to stdout and exits 0. Constants `VERSION` and `SPEC_SHA256` hold the values.
+
 ---
 
 ## 5. TYPE-BINDINGS
@@ -153,43 +159,78 @@ and Java best practices for decimal arithmetic:
 
 ## 6. Phase 5 — Compile Gate
 
+**Executed on:** 2026-04-13  
+**Maven version:** Apache Maven 3.9.9  
+**Java version:** OpenJDK 25.0.2 (SUSE build, JVM 64-bit)
+
 ### Step 1 — Dependency resolution
 
-Maven (`mvn package`) resolves all dependencies from Maven Central. The
+Maven (`mvn clean test`) resolves all dependencies from Maven Central. The
 `pom.xml` declares only direct dependencies:
 - `org.junit.jupiter:junit-jupiter:5.10.2` (test scope only)
 
 No indirect dependencies were hand-written.
 
-**Result: PASS** — `mvn -q package` exited 0.
+**Result: PASS** — dependency resolution completed without errors.
 
 ### Step 2 — Compilation and test execution
 
 ```
-mvn -q package    → EXIT 0  (compilation: PASS)
-mvn -q test       → EXIT 0  (tests: PASS)
+mvn clean test    → BUILD SUCCESS  (compilation + tests: PASS)
 ```
 
-Test summary:
+Actual test summary (run 2026-04-13):
 ```
-Tests run: 15, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 16, Failures: 0, Errors: 0, Skipped: 0
 ```
+
+Note: 16 tests ran (not 15 as originally projected); the `versionOutput` test
+added for the v0.2.0 `version` subcommand brings the total to 16.
 
 ### Step 3 — Integration smoke test (functional verification)
 
+All six spec EXAMPLEs verified against `target/calc-interest.jar`
+(fat JAR built via `mvn package`):
+
 ```sh
+# EXAMPLE: version_output
+java -jar target/calc-interest.jar version
+# calc-interest 0.2.0 spec:8279a6f935e0a8c1f7e3caa355a553dcb6470960bb2d87b6b4cda99caa48f941
+# EXIT: 0  ✓
+
+# EXAMPLE: typical_calculation
 echo -e "10000.00\n0.0350\n12" | java -jar target/calc-interest.jar
 # INTEREST: 4200.00
 # TOTAL:    14200.00
-# EXIT: 0
+# EXIT: 0  ✓
+
+# EXAMPLE: zero_rate_rejected
+echo -e "10000.00\n0.0000\n12" | java -jar target/calc-interest.jar
+# stderr: invalid rate
+# EXIT: 2  ✓
+
+# EXAMPLE: zero_principal_rejected
+echo -e "0.00\n0.0350\n12" | java -jar target/calc-interest.jar
+# stderr: invalid principal
+# EXIT: 2  ✓
+
+# EXAMPLE: zero_periods_rejected
+echo -e "10000.00\n0.0350\n0" | java -jar target/calc-interest.jar
+# stderr: invalid periods
+# EXIT: 2  ✓
+
+# EXAMPLE: non_numeric_input_rejected
+echo -e "abc\n0.0350\n12" | java -jar target/calc-interest.jar
+# stderr: error reading principal: not a valid number: abc
+# EXIT: 1  ✓
 ```
 
-All five spec EXAMPLEs verified against the compiled JAR (see Section 8).
+All 6 spec EXAMPLEs verified against the compiled JAR — all PASS.
 
 ### Cleanup
 
-`mvn -q clean` was run after verification. The `target/` directory was removed.
-No temporary files remain.
+`target/` directory retained for reference. Run `mvn clean` to remove build
+artefacts.
 
 ---
 
@@ -197,8 +238,8 @@ No temporary files remain.
 
 | Key | Constraint | Value | Status |
 |-----|------------|-------|--------|
-| VERSION | required | 0.1.0 | ✅ |
-| SPEC-SCHEMA | required | 0.3.21 | ✅ |
+| VERSION | required | 0.2.0 | ✅ |
+| SPEC-SCHEMA | required | 0.3.22 | ✅ |
 | AUTHOR | required | Unknown | ✅ |
 | LICENSE | required | Apache-2.0 | ✅ |
 | LANGUAGE | default (Go) | Java (override) | ⚠️ Deviation — user-requested |
@@ -233,11 +274,12 @@ No temporary files remain.
 
 | EXAMPLE | Confidence | Verification method | Unverified claims |
 |---------|------------|---------------------|-------------------|
-| typical_calculation | **High** | `CalcInterestTest#typicalCalculation` passes; functional JAR run confirmed `INTEREST: 4200.00` / `TOTAL: 14200.00` / exit 0 | None |
-| zero_rate_rejected | **High** | `CalcInterestTest#zeroRateRejected` passes; JAR run confirmed stderr "invalid rate" / exit 2 | None |
-| zero_principal_rejected | **High** | `CalcInterestTest#zeroPrincipalRejected` passes; JAR run confirmed stderr "invalid principal" / exit 2 | None |
-| zero_periods_rejected | **High** | `CalcInterestTest#zeroPeriodsRejected` passes; JAR run confirmed stderr "invalid periods" / exit 2 | None |
-| non_numeric_input_rejected | **High** | `CalcInterestTest#nonNumericInputRejected` passes; JAR run confirmed stderr error message / exit 1 | None |
+| typical_calculation | **High** | `CalcInterestTest#typicalCalculation` passes (16/16 tests, 2026-04-13); JAR smoke test confirmed `INTEREST: 4200.00` / `TOTAL:    14200.00` / exit 0 | None |
+| zero_rate_rejected | **High** | `CalcInterestTest#zeroRateRejected` passes; JAR smoke test confirmed stderr "invalid rate" / exit 2 | None |
+| zero_principal_rejected | **High** | `CalcInterestTest#zeroPrincipalRejected` passes; JAR smoke test confirmed stderr "invalid principal" / exit 2 | None |
+| zero_periods_rejected | **High** | `CalcInterestTest#zeroPeriodsRejected` passes; JAR smoke test confirmed stderr "invalid periods" / exit 2 | None |
+| non_numeric_input_rejected | **High** | `CalcInterestTest#nonNumericInputRejected` passes; JAR smoke test confirmed stderr "error reading principal: not a valid number: abc" / exit 1 | None |
+| version_output | **High** | `CalcInterestTest#versionOutput` passes; JAR smoke test confirmed "calc-interest 0.2.0 spec:8279a6f935e0a8c1f7e3caa355a553dcb6470960bb2d87b6b4cda99caa48f941" / exit 0 | None |
 
 ---
 
@@ -306,3 +348,21 @@ infrastructure files (CRDs, manifests, RBAC) were produced.
 No hints file was present. If the version requires verification before
 building in a restricted environment, consult
 <https://central.sonatype.com/artifact/org.junit.jupiter/junit-jupiter>.
+
+---
+
+## 16. Update Notes (v0.1.0 → v0.2.0)
+
+**Minimal change update applied on 2026-04-13.**
+
+Changes made:
+- `Main.java`: updated header sha256, javadoc version/schema, added `VERSION`
+  and `SPEC_SHA256` constants, added `version` subcommand handling at the top
+  of `main()` before stdin reading, updated `@param args` javadoc.
+- `CalcInterestTest.java`: updated header sha256, javadoc version/schema,
+  added `versionOutput()` test method for the new `version_output` EXAMPLE.
+- `pom.xml`: version bumped from `0.1.0` to `0.2.0`.
+- `TRANSLATION_REPORT.md`: updated all version/schema/sha256 references,
+  added BEHAVIOR: version block, added `version_output` row to Per-Example
+  Confidence Table, updated VERSION row in Template Constraints Compliance
+  Table, updated smoke test example, added this update notes section.
