@@ -4,9 +4,10 @@
 
 **Spec:** mcp-server-pcd v0.2.0  
 **Spec-Schema:** 0.3.21  
+Spec-SHA256: f3adb0ce96e17d090644e5c46d2bb7a4022df3f2ee2cbd6374ccd4474c815ea5  
 **Template:** mcp-server.template v0.3.20  
 **Initial translation date:** 2026-04-07  
-**Enhancement date:** 2026-04-07  
+**Enhancement date:** 2026-04-13  
 
 ---
 
@@ -307,3 +308,31 @@ Key derivation verified:
 
 5. **`internal/store/assets/`** — Populated with real assets from `/tmp/pcd-input/`:
    9 templates, 6 hints files, 3 prompts. Removed stub files.
+
+---
+
+## Changes Made in RULE-18 / verify_spec_hash Update (2026-04-13)
+
+The spec (v0.3.21) covers RULE-18 via the `verify_spec_hash` and `assess_change_impact`
+tools (required BEHAVIORs). These were missing from the previous implementation.
+
+1. **`main.go`** — Added `verify_spec_hash` tool registration and `makeVerifySpecHashHandler()`:
+   implements BEHAVIOR: verify_spec_hash exactly per spec STEPS 1–5.
+   Added `assess_change_impact` tool registration and `makeAssessChangeImpactHandler()`:
+   implements BEHAVIOR: assess_change_impact per spec STEPS 1–10.
+   Added imports: `crypto/sha256`, `io`, `regexp`.
+
+2. **`TRANSLATION_REPORT.md`** — Added `Spec-SHA256:` field recording the SHA256 of the
+   spec file at the time of this update:
+   `f3adb0ce96e17d090644e5c46d2bb7a4022df3f2ee2cbd6374ccd4474c815ea5`
+
+**Compile gate:** `go build ./...` — PASS  
+**Test gate:** `go test ./independent_tests/...` — PASS (37 tests, 0 failures)
+
+**SHA256 verification:**
+```
+sha256sum spec/mcp-server-pcd.md
+f3adb0ce96e17d090644e5c46d2bb7a4022df3f2ee2cbd6374ccd4474c815ea5  spec/mcp-server-pcd.md
+```
+The `Spec-SHA256:` field in this report matches the current spec file. Running
+`verify_spec_hash` with this spec will return `status: "current"` and `match: true`.

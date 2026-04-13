@@ -7,13 +7,16 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -200,6 +203,39 @@ func buildServer(assetStore store.AssetStore) *server.MCPServer {
 			),
 		),
 		makeSetMilestoneStatusHandler(fs),
+	)
+
+	// verify_spec_hash
+	s.AddTool(
+		mcp.NewTool("verify_spec_hash",
+			mcp.WithDescription("Compute the SHA256 of a spec file and compare it to the Spec-SHA256: field in TRANSLATION_REPORT.md."),
+			mcp.WithString("spec_path",
+				mcp.Required(),
+				mcp.Description("Path to the spec .md file"),
+			),
+		),
+		makeVerifySpecHashHandler(),
+	)
+
+	// assess_change_impact
+	s.AddTool(
+		mcp.NewTool("assess_change_impact",
+			mcp.WithDescription("Analyse a specification change and recommend full-regeneration or incremental update."),
+			mcp.WithString("change_description",
+				mcp.Required(),
+				mcp.Description("Unified diff or plain-language description of what changed"),
+			),
+			mcp.WithString("old_spec",
+				mcp.Description("Full spec content before the change (optional)"),
+			),
+			mcp.WithString("new_spec",
+				mcp.Description("Full spec content after the change (optional)"),
+			),
+			mcp.WithString("existing_code",
+				mcp.Description("Generated implementation (optional)"),
+			),
+		),
+		makeAssessChangeImpactHandler(),
 	)
 
 	// ── Resource templates (dynamic URIs) ──────────────────────────────────────
@@ -534,6 +570,235 @@ func makeSetMilestoneStatusHandler(fs milestone.Filesystem) server.ToolHandlerFu
 			MilestoneName:  result.MilestoneName,
 			PreviousStatus: string(result.PreviousStatus),
 			NewStatus:      string(result.NewStatus),
+		})
+		return mcp.NewToolResultText(string(data)), nil
+	}
+}
+
+// reSpecSHA256 matches "Spec-SHA256: <64 hex chars>" in TRANSLATION_REPORT.md.
+var reSpecSHA256 = regexp.MustCompile(`(?m)^Spec-SHA256:\s+([0-9a-f]{64})`)
+
+func makeVerifySpecHashHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		specPath := req.GetString("spec_path", "")
+
+		// Validate input
+		if specPath == "" {
+			return mcp.NewToolResultError("spec_path is required"), nil
+		}
+		if !strings.HasSuffix(specPath, ".md") {
+			return mcp.NewToolResultError(fmt.Sprintf("spec_path must end in .md: %s", specPath)), nil
+		}
+
+		// Step 1: compute SHA256 of spec file
+		f, err := os.Open(specPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cannot open file: %s", specPath)), nil
+		}
+		h := sha256.New()
+		if _, err := io.Copy(h, f); err != nil {
+			f.Close()
+			return mcp.NewToolResultError(fmt.Sprintf("cannot read file: %s", specPath)), nil
+		}
+		f.Close()
+		specHash := fmt.Sprintf("%x", h.Sum(nil))
+
+		// Step 2: locate TRANSLATION_REPORT.md
+		dir := filepath.Dir(specPath)
+		candidates := []string{
+			filepath.Join(dir, "TRANSLATION_REPORT.md"),
+			filepath.Join(dir, "code", "TRANSLATION_REPORT.md"),
+		}
+		reportPath := ""
+		for _, c := range candidates {
+			if _, err := os.Stat(c); err == nil {
+				reportPath = c
+				break
+			}
+		}
+
+		type specHashResultJSON struct {
+			SpecPath   string `json:"spec_path"`
+			SpecHash   string `json:"spec_hash"`
+			ReportHash string `json:"report_hash"`
+			Match      bool   `json:"match"`
+			Status     string `json:"status"`
+		}
+
+		if reportPath == "" {
+			data, _ := json.Marshal(specHashResultJSON{
+				SpecPath: specPath, SpecHash: specHash,
+				ReportHash: "", Match: false, Status: "no-report",
+			})
+			return mcp.NewToolResultText(string(data)), nil
+		}
+
+		// Step 3: search for Spec-SHA256: line
+		reportBytes, err := os.ReadFile(reportPath)
+		if err != nil {
+			data, _ := json.Marshal(specHashResultJSON{
+				SpecPath: specPath, SpecHash: specHash,
+				ReportHash: "", Match: false, Status: "no-report",
+			})
+			return mcp.NewToolResultText(string(data)), nil
+		}
+		m := reSpecSHA256.FindStringSubmatch(string(reportBytes))
+		if m == nil {
+			data, _ := json.Marshal(specHashResultJSON{
+				SpecPath: specPath, SpecHash: specHash,
+				ReportHash: "", Match: false, Status: "no-hash-in-report",
+			})
+			return mcp.NewToolResultText(string(data)), nil
+		}
+
+		// Step 4-5: compare
+		reportHash := m[1]
+		match := specHash == reportHash
+		status := "stale"
+		if match {
+			status = "current"
+		}
+		data, _ := json.Marshal(specHashResultJSON{
+			SpecPath: specPath, SpecHash: specHash,
+			ReportHash: reportHash, Match: match, Status: status,
+		})
+		return mcp.NewToolResultText(string(data)), nil
+	}
+}
+
+func makeAssessChangeImpactHandler() server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		changeDescription := req.GetString("change_description", "")
+		oldSpec := req.GetString("old_spec", "")
+		newSpec := req.GetString("new_spec", "")
+		existingCode := req.GetString("existing_code", "")
+
+		// Step 1: validate
+		if changeDescription == "" {
+			return mcp.NewToolResultError("change_description is required"), nil
+		}
+
+		// Step 1-3: parse change_description to identify affected sections
+		highImpactKeywords := []string{"TYPES", "INTERFACES", "INVARIANTS"}
+		structuralImpact := "low"
+		primaryFactor := ""
+		scaffoldAffected := false
+		releasedMilestoneAffected := false
+
+		combined := changeDescription + "\n" + oldSpec + "\n" + newSpec
+		combinedLower := strings.ToLower(combined)
+
+		for _, kw := range highImpactKeywords {
+			if strings.Contains(combined, kw) {
+				structuralImpact = "high"
+				primaryFactor = kw
+				break
+			}
+		}
+
+		// Count affected BEHAVIORs for blast radius
+		behaviorCount := strings.Count(combined, "BEHAVIOR")
+		blastRadius := "1–2 BEHAVIORs"
+		if behaviorCount >= 5 {
+			blastRadius = "5+ BEHAVIORs or shared types"
+		} else if behaviorCount >= 3 {
+			blastRadius = "3–5 BEHAVIORs"
+		}
+		if existingCode != "" {
+			// Refine blast radius from code references
+			codeCount := strings.Count(existingCode, "func ")
+			if codeCount >= 5 {
+				blastRadius = "5+ BEHAVIORs or shared types"
+			}
+		}
+
+		// Step 4: scaffold involvement
+		if strings.Contains(combinedLower, "scaffold") {
+			scaffoldAffected = true
+			if primaryFactor == "" {
+				primaryFactor = "scaffold milestone affected"
+			}
+		}
+
+		// Step 5: released milestone involvement
+		if strings.Contains(combinedLower, "status: released") || strings.Contains(combinedLower, "released milestone") {
+			releasedMilestoneAffected = true
+		}
+
+		// Step 7: consistency risk
+		consistencyRisk := "low"
+		if structuralImpact == "high" {
+			consistencyRisk = "high"
+		} else if behaviorCount >= 3 {
+			consistencyRisk = "medium"
+		}
+
+		// Step 8: apply decision rules
+		recommendation := "incremental"
+		ifIncremental := ""
+		ifRegeneration := ""
+
+		if structuralImpact == "high" || scaffoldAffected || releasedMilestoneAffected {
+			recommendation = "full-regeneration"
+			if primaryFactor == "" {
+				if releasedMilestoneAffected {
+					primaryFactor = "released milestone affected"
+				} else {
+					primaryFactor = "structural impact"
+				}
+			}
+			ifRegeneration = "Preserve all decisions documented in TRANSLATION_REPORT.md as translator notes before regenerating."
+		} else if structuralImpact == "low" && behaviorCount <= 2 {
+			recommendation = "incremental"
+			if primaryFactor == "" {
+				primaryFactor = "isolated BEHAVIOR change with low structural impact"
+			}
+			ifIncremental = "Update only the implementation functions corresponding to the changed BEHAVIOR(s). Re-run compile gate and affected tests."
+		} else {
+			recommendation = "full-regeneration"
+			if primaryFactor == "" {
+				primaryFactor = "conservative default: impact scope unclear"
+			}
+			ifRegeneration = "Preserve all decisions documented in TRANSLATION_REPORT.md as translator notes before regenerating."
+		}
+
+		// Step 9: compose reasoning
+		reasoning := fmt.Sprintf(
+			"Change description: %s\n"+
+				"Structural impact: %s (affected sections: %s).\n"+
+				"Blast radius: %s.\n"+
+				"Scaffold affected: %v. Released milestone affected: %v.\n"+
+				"Consistency risk: %s.\n"+
+				"Recommendation: %s — primary factor: %s.",
+			changeDescription, structuralImpact, primaryFactor,
+			blastRadius, scaffoldAffected, releasedMilestoneAffected,
+			consistencyRisk, recommendation, primaryFactor,
+		)
+
+		type changeImpactResultJSON struct {
+			Recommendation              string `json:"recommendation"`
+			PrimaryFactor               string `json:"primary_factor"`
+			StructuralImpact            string `json:"structural_impact"`
+			BlastRadius                 string `json:"blast_radius"`
+			ScaffoldAffected            bool   `json:"scaffold_affected"`
+			ReleasedMilestoneAffected   bool   `json:"released_milestone_affected"`
+			ConsistencyRisk             string `json:"consistency_risk"`
+			IfIncremental               string `json:"if_incremental"`
+			IfRegeneration              string `json:"if_regeneration"`
+			Reasoning                   string `json:"reasoning"`
+		}
+
+		data, _ := json.Marshal(changeImpactResultJSON{
+			Recommendation:            recommendation,
+			PrimaryFactor:             primaryFactor,
+			StructuralImpact:          structuralImpact,
+			BlastRadius:               blastRadius,
+			ScaffoldAffected:          scaffoldAffected,
+			ReleasedMilestoneAffected: releasedMilestoneAffected,
+			ConsistencyRisk:           consistencyRisk,
+			IfIncremental:             ifIncremental,
+			IfRegeneration:            ifRegeneration,
+			Reasoning:                 reasoning,
 		})
 		return mcp.NewToolResultText(string(data)), nil
 	}

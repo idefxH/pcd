@@ -3,8 +3,9 @@
 **Component:** pcd-lint  
 **Spec Version:** 0.3.21  
 **Template:** cli-tool.template.md v0.3.20  
-**Date:** 2026-04-07  
-**Translator:** Claude Sonnet 4.5
+**Date:** 2026-04-07 (updated 2026-04-13)  
+**Translator:** Claude Sonnet 4.5 (update: Claude Sonnet 4.5)  
+Spec-SHA256: afa05d1e406f0d8d8d23ba19e48bb0986afba623ea59ff43cfd7b5b29cc30354
 
 ---
 
@@ -75,7 +76,7 @@ Each BEHAVIOR block's STEPS were implemented in the exact order written:
 ### BEHAVIOR: lint
 1. `.md` extension check → exit 2 (implemented in `main.go`)
 2. File open/read → exit 2 on failure (implemented in `main.go`)
-3. Apply RULE-01 through RULE-17 in order — all rules run regardless of earlier errors (implemented in `LintSpec()`)
+3. Apply RULE-01 through RULE-18 in order — all rules run regardless of earlier errors; RULE-18 only runs when check-report=true (implemented in `LintSpec()`)
 4. Sort diagnostics by line number (sort.SliceStable)
 5. Write diagnostics to stderr
 6. Compute exit_code
@@ -94,7 +95,7 @@ Implemented as a `fenceDepth` integer counter (not boolean toggle) in both `pars
 6. Exit 0
 
 ### BEHAVIOR: lint-validation-rules
-RULE-01 through RULE-17 applied in exact order as specified. All rules independent — no short-circuiting.
+RULE-01 through RULE-18 applied in exact order as specified. All rules independent — no short-circuiting. RULE-18 is only evaluated when `check-report=true`.
 
 ---
 
@@ -136,7 +137,7 @@ No `## GENERATED-FILE-BINDINGS` section present in the cli-tool template. File n
 | lint | required | Yes — primary operation |
 | code-fence-tracking | required | Yes — integrated into parser |
 | list-templates | required | Yes — `CmdListTemplates()` |
-| lint-validation-rules | required | Yes — RULE-01 through RULE-17 |
+| lint-validation-rules | required | Yes — RULE-01 through RULE-18 |
 
 No `supported` or `forbidden` BEHAVIOR blocks were present in the spec.
 
@@ -210,6 +211,17 @@ Go's default SIGTERM/SIGINT handling terminates the process cleanly. This satisf
 | RULE-12c (file name consistency) | Not implemented | Requires DELIVERABLES COMPONENT entries which pcd-lint spec does not have in structured form. |
 
 Both deviations are within the spec's own note: "State-machine and endpoint semantic consistency deferred to v0.4.0."
+
+---
+
+## Post-Initial Corrections (2026-04-13)
+
+Two defects identified during spec-vs-implementation comparison and corrected with minimal changes:
+
+| # | Defect | Fix |
+|---|--------|-----|
+| 1 | `independent_tests/INDEPENDENT_TESTS_test.go` imported wrong module path `github.com/pcd-tools/pcd-lint/internal/lint` (module is `github.com/mge1512/pcd-lint`) — caused `go test` to fail with "no required module provides package" | Changed import to `github.com/mge1512/pcd-lint/internal/lint` |
+| 2 | `check-report=true` option and RULE-18 not implemented — spec v0.3.21 defines `check_report` as a BEHAVIOR: lint input and RULE-18 as a required rule | Added `check-report` option parsing to `main.go`; extended `LintSpec` signature with variadic `checkReport ...bool`; implemented `applyRule18()` in `lint.go` |
 
 ---
 

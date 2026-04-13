@@ -32,6 +32,7 @@ func main() {
 
 	// Parse key=value options
 	strict := false
+	checkReport := false
 	var fileArg string
 
 	for _, a := range args {
@@ -45,6 +46,15 @@ func main() {
 					strict = true
 				} else if val == "false" {
 					strict = false
+				} else {
+					fmt.Fprintf(os.Stderr, "error: unrecognised option: %s\n", key)
+					os.Exit(2)
+				}
+			case "check-report":
+				if val == "true" {
+					checkReport = true
+				} else if val == "false" {
+					checkReport = false
 				} else {
 					fmt.Fprintf(os.Stderr, "error: unrecognised option: %s\n", key)
 					os.Exit(2)
@@ -79,7 +89,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	result := lint.LintSpec(fileArg, strict)
+	result := lint.LintSpec(fileArg, strict, checkReport)
 
 	// Write diagnostics to stderr
 	for _, d := range result.Diagnostics {
@@ -93,7 +103,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: pcd-lint [strict=true] <specfile.md>")
+	fmt.Fprintln(os.Stderr, "usage: pcd-lint [strict=true] [check-report=true] <specfile.md>")
 	fmt.Fprintln(os.Stderr, "       pcd-lint list-templates")
 	fmt.Fprintln(os.Stderr, "       pcd-lint version")
 }

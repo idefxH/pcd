@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pcd-tools/pcd-lint/internal/lint"
+	"github.com/mge1512/pcd-lint/internal/lint"
 )
 
 // Re-export types for convenience in test functions

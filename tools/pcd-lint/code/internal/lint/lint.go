@@ -5,7 +5,9 @@ package lint
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -606,7 +608,8 @@ func containsLine(lines []specLine, pred func(string) bool) (int, bool) {
 
 // ── LintSpec — main entry point ───────────────────────────────────────────────
 
-func LintSpec(path string, strict bool) LintResult {
+func LintSpec(path string, strict bool, checkReport ...bool) LintResult {
+	doCheckReport := len(checkReport) > 0 && checkReport[0]
 	result := LintResult{File: path}
 
 	ps, err := parseSpec(path)
@@ -897,6 +900,11 @@ func LintSpec(path string, strict bool) LintResult {
 		applyRule15(ps, add)
 		applyRule16(ps, add)
 		applyRule17(ps, add)
+	}
+
+	// RULE-18
+	if doCheckReport {
+		applyRule18(path, add)
 	}
 
 	// Sort by line number
@@ -1270,7 +1278,74 @@ func applyRule17(ps *parsedSpec, add func(Severity, string, int, string)) {
 	}
 }
 
-// ── Output formatting ─────────────────────────────────────────────────────────
+// ── RULE-18 ───────────────────────────────────────────────────────────────────
+
+var reSpecSHA256 = regexp.MustCompile(`(?m)^Spec-SHA256:\s+([0-9a-f]{64})`)
+
+func applyRule18(specPath string, add func(Severity, string, int, string)) {
+	dir := filepath.Dir(specPath)
+
+	// Locate TRANSLATION_REPORT.md adjacent to spec (same dir or code/ subdir)
+	candidates := []string{
+		filepath.Join(dir, "TRANSLATION_REPORT.md"),
+		filepath.Join(dir, "code", "TRANSLATION_REPORT.md"),
+	}
+	reportPath := ""
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			reportPath = c
+			break
+		}
+	}
+	if reportPath == "" {
+		return
+	}
+
+	reportBytes, err := os.ReadFile(reportPath)
+	if err != nil {
+		return
+	}
+	reportContent := string(reportBytes)
+
+	m := reSpecSHA256.FindStringSubmatch(reportContent)
+	if m == nil {
+		add(SevWarning, "report", 1,
+			"TRANSLATION_REPORT.md is missing Spec-SHA256: field. "+
+				"Every translation run must record the SHA256 of the spec "+
+				"it was produced from. Run: sha256sum <specname>.md")
+		return
+	}
+
+	recordedHash := m[1]
+	currentHash, err := sha256File(specPath)
+	if err != nil {
+		return
+	}
+	if recordedHash != currentHash {
+		add(SevWarning, "report", 1,
+			fmt.Sprintf("Spec has changed since last translation run.\n"+
+				"                 Recorded hash: %s\n"+
+				"                 Current hash:  %s\n"+
+				"                 Regeneration may be required. Run: pcd change-impact\n"+
+				"                 or use assess_change_impact via mcp-server-pcd.",
+				recordedHash, currentHash))
+	}
+}
+
+func sha256File(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+
 
 func FormatDiagnostic(d Diagnostic, file string) string {
 	sev := d.Severity.String()
