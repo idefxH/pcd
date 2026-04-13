@@ -311,7 +311,7 @@ structure. RULE-12 covers cross-section consistency. RULE-13 covers BEHAVIOR
 Constraint: field values. RULE-14 covers EXECUTION section presence in deployment
 templates. RULE-15 through RULE-17 cover the MILESTONE mechanism. RULE-18
 detects spec hash drift between the current specification and the recorded
-hash in the adjacent TRANSLATION_REPORT.md (requires `--check-report` flag).
+hash in the adjacent TRANSLATION_REPORT.md (requires `check-report=true`).
 
 The rules are implemented in `internal/lint/lint.go` as an importable Go
 library, not only as a command-line tool. This is why `mcp-server-pcd` can
@@ -557,7 +557,7 @@ link between the certified specification and the deployed artifact.
 The decision to embed the hash in every artifact, rather than only in the
 translation report, was deliberate. A hash only in the translation report
 requires that the translation report accompany every artifact. A hash embedded
-in the artifact itself — in a source file comment, in `--version` output, in
+in the artifact itself — in a source file comment, in the version subcommand output, in
 a Containerfile `LABEL`, in RPM metadata — means any single artifact can be
 verified independently, without access to the audit bundle.
 

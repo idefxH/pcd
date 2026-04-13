@@ -171,7 +171,7 @@ Embed the result in every generated artifact as follows:
   `// generated from spec: <specname>.md sha256:<hash>`
   (use the comment syntax of the target language)
 - **`TRANSLATION_REPORT.md`:** a `Spec-SHA256:` field in the header block
-- **Binary `--version` output:** include `spec:<hash>` in the version string
+- **Binary version output:** include `spec:<hash>` in the version subcommand output
 - **RPM `.spec` file:** a `# pcd-spec-sha256: <hash>` comment
 - **DEB `control` file:** a `X-PCD-Spec-SHA256: <hash>` field
 - **`Containerfile`:** a `LABEL pcd.spec.sha256="<hash>"` instruction

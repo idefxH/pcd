@@ -380,7 +380,7 @@ done
 deployment=$(grep "^Deployment:" "$spec_file" | awk '{print $2}')
 spec-template-resolve "$deployment" || {
   echo "ERROR: Unknown deployment template: $deployment"
-  echo "       Use 'pcd-lint --list-templates' to see available templates"
+  echo "       Use 'pcd-lint list-templates' to see available templates"
   exit 1
 }
 
@@ -2148,7 +2148,7 @@ an indexing gap in the report, not an implementation gap.
 
 *CLI style correct.* All commands use bare-word and key=value syntax
 (`pcd-lint strict=true myspec.md`, `pcd-lint list-templates`) with no
-`--flags`. One slip in INDEX.md (`pcd-lint --help`) did not affect the
+`--flags`. One slip in INDEX.md (`pcd-lint help`) did not affect the
 implementation.
 
 *SPDX compound expressions.* The `Apache-2.0 OR MIT` compound expression

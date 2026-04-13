@@ -123,6 +123,7 @@ INPUTS:
 ```
 file:   SpecFile
 strict: bool     // strict=true treats warnings as errors; default false
+check_report: bool // check-report=true evaluates RULE-18; default false
 ```
 
 OUTPUTS:
@@ -134,6 +135,7 @@ PRECONDITIONS:
 - file exists and is readable
 - file has `.md` extension
 - strict is a valid boolean (true | false)
+- check_report is a valid boolean (true | false)
 
 STEPS:
 1. Verify file has `.md` extension; on failure → exit 2 with
@@ -268,7 +270,7 @@ STEPS:
 15. Apply RULE-15 (MILESTONE section structure and single-active constraint, if present).
 16. Apply RULE-16 (MILESTONE BEHAVIOR names exist in spec, if present).
 17. Apply RULE-17 (scaffold milestone ordering and uniqueness, if present).
-18. Apply RULE-18 (spec hash presence in TRANSLATION_REPORT, if --check-report).
+18. Apply RULE-18 (spec hash presence in TRANSLATION_REPORT, if check-report=true).
     MECHANISM: rules are independent; a failure in one rule does not prevent
     subsequent rules from running. All diagnostics are collected before output.
 
@@ -756,7 +758,7 @@ if TRANSLATION_REPORT.md exists adjacent to spec:
 
 Note: RULE-18 emits Warnings only, never Errors. The spec itself may be
 valid; the mismatch indicates a process concern, not a structural defect.
-RULE-18 is only evaluated when `--check-report` flag is passed or when
+RULE-18 is only evaluated when 
 `check-report=true` is set, to avoid false positives in spec-only workflows.
 
 ---
@@ -1272,7 +1274,7 @@ GIVEN:
     Scaffold: true
     Included BEHAVIORs: collect, render, main
     Acceptance criteria:
-      ./tool --version | grep -q "^tool "
+      ./tool version | grep -q "^tool "
     ## MILESTONE: 0.1.0
     Status: active
     Included BEHAVIORs: collect
@@ -1409,11 +1411,17 @@ Runtime dependency:
 Invocation:
   pcd-lint <specfile.md>
   pcd-lint strict=true <specfile.md>
+  pcd-lint check-report=true <specfile.md>
+  pcd-lint strict=true check-report=true <specfile.md>
   pcd-lint list-templates
 
 Key=value options (all optional, precede the file argument):
-  strict=true     Treat warnings as errors; exit 1 on warnings
-                  Default: strict=false
+  strict=true          Treat warnings as errors; exit 1 on warnings
+                       Default: strict=false
+  check-report=true    Also evaluate RULE-18: look for TRANSLATION_REPORT.md
+                       adjacent to the spec, verify Spec-SHA256 field presence
+                       and hash currency. Emits warnings only; never errors.
+                       Default: check-report=false
 
 Commands (bare words, no file argument):
   list-templates  Print all known deployment templates and exit 0
