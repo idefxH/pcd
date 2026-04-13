@@ -1,94 +1,17 @@
 
-
 # Post-Coding Development (PCD, Piccadilly)
 
 **Human Intent, Machine Implementation.**
 
 ## Meet me at the Piccadilly — where intent becomes implementation
 
-**PCD** is pronounced **Piccadilly** — the three letters of the acronym (highlighted: **P**i**C**ca**D**illy) spell out a real place name, turning an abstract abbreviation into something memorable. It also captures where the work happens: at the intersection of intent and implementation — much like Piccadilly Circus sits at the intersection of several roads in London.
+**PCD** is pronounced **Piccadilly** — the three letters of the acronym (highlighted: **P**i**C**ca**D**illy) spell out a real place name. It captures where the work happens: at the intersection of intent and implementation — much like Piccadilly Circus sits at the intersection of several roads in London.
 
 PCD is an open specification for a new software development paradigm: domain experts write structured natural-language specifications; AI generates all implementation code. Engineers never write implementation code directly.
 
-This is not "AI-assisted coding" where developers write code with AI suggestions. This is **Post-Coding Development** — a paradigm named for the era we are entering: one where writing code is no longer the central human activity in software creation. Specifications are the primary artifact; code is a generated output.
+This is not "AI-assisted coding". In vibe coding, developers write code with AI suggestions. In PCD, domain experts write specifications and AI generates all implementation code. The specification is always the source of truth — if the generated code is wrong, fix the specification and regenerate.
 
-**The key distinction:** if the generated code is wrong, you never edit the code — you fix the specification and regenerate. The spec is always the source of truth.
-
-`pcd-lint`, the reference validator in this repository, was itself specified and generated using PCD — with zero hand-written implementation code.
-
----
-
-## Core Workflow
-
-```mermaid
-flowchart LR
-    spec["SPEC
-types · behavior
-examples · invariants"]
-    lint{"pcd-lint"}
-    tmpl["TEMPLATE
-cli-tool · backend-service
-cloud-native · mcp-server · ..."]
-    llm["LLM
-Translator"]
-    direct["Direct
-Spec → Go / C / Rust"]
-    verified["Verified
-Spec → Lean 4 / F* → Go / C"]
-    bundle["AUDIT BUNDLE
-code · proofs
-report · metadata"]
-
-    spec --> lint
-    lint -->|valid| tmpl
-    lint -->|invalid| spec
-    tmpl --> llm
-    llm --> direct & verified
-    direct & verified --> bundle
-
-    style spec fill:#e1f5ff,stroke:#4a9eff
-    style lint fill:#fff4e1,stroke:#ffaa00
-    style tmpl fill:#e8f5e9,stroke:#4caf50
-    style llm fill:#ffe1f0,stroke:#e91e8c
-    style direct fill:#f3e5f5,stroke:#9c27b0
-    style verified fill:#f3e5f5,stroke:#9c27b0
-    style bundle fill:#fce4ec,stroke:#e91e63
-```
-
----
-
-## Target Language Resolution
-
-The target language is **never declared in the specification**. It is derived automatically from the deployment template.
-
-```mermaid
-flowchart LR
-    spec["Deployment: cli-tool"]
-    presets["/usr/share/pcd/ → /etc/pcd/
-~/.config/pcd/ → ./.pcd/"]
-    resolved["Language: Go
-RPM · DEB · OCI via OBS"]
-
-    spec --> presets --> resolved
-
-    style spec fill:#e1f5ff,stroke:#4a9eff
-    style presets fill:#e8f5e9,stroke:#4caf50
-    style resolved fill:#fce4ec,stroke:#e91e63
-```
-
----
-
-## Key Concepts
-
-**Deployment templates** define what a target environment requires — language defaults, binary type, packaging formats, installation method, conventions. The spec author declares `Deployment: cli-tool`, `Deployment: backend-service`, or another template, and the template resolves implementation details automatically.
-
-**Verification paths** are optional and pluggable:
-- *Direct path:* Specification → Go/C/Rust — fast iteration, lower assurance
-- *Verified path:* Specification → Lean 4/F*/Dafny → Go/C — formal proofs, highest assurance
-
-**Milestones** enable phased translation for large components. A spec may declare a chain of milestones, each a named subset of BEHAVIORs. A pipeline agent advances the milestone cursor automatically; the human intervenes only on failures.
-
-**Audit bundles** are first-class outputs: specification + generated code + proofs (if any) + translation report + metadata. Designed for regulatory compliance with ISO 26262, DO-178C, IEC 62304, and Common Criteria.
+`pcd-lint` and `mcp-server-pcd`, the reference tools in this repository, were themselves specified and generated using PCD — with zero hand-written implementation code.
 
 ---
 
@@ -96,10 +19,25 @@ RPM · DEB · OCI via OBS"]
 
 | Document | Audience | Location |
 |---|---|---|
-| **User guide** — how to write specs, use milestones, translate to code | Spec authors | [`doc/guide.md`](doc/guide.md) |
-| **Whitepaper** — paradigm, theory, related work | Researchers, decision-makers | [`doc/whitepaper.md`](doc/whitepaper.md) |
+| **User guide** — how to start, write specs, translate to code, manage lifecycle | Spec authors and engineers | [`doc/user-guide.md`](doc/user-guide.md) ← **START HERE** |
+| **Technical reference** — why decisions were made, design rationale | Engineers and architects | [`doc/technical-reference.md`](doc/technical-reference.md) |
+| **Whitepaper** — paradigm goals, evidence, strategic context | Researchers, decision-makers | [`doc/whitepaper.md`](doc/whitepaper.md) |
 | **Executive brief** — business case, value proposition | Management | [`doc/executive-brief.md`](doc/executive-brief.md) |
 | **Contributing** — how to improve PCD itself | Framework contributors | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+
+---
+
+## Core Workflow
+
+```
+You write a spec  →  pcd-lint validates  →  AI translates to code
+       ↑                                            |
+       └──────── fix the spec if output is wrong ───┘
+```
+
+The target language is **never declared in the specification**. It is derived automatically from the deployment template. A spec written today for a Go binary is the same spec that produces a Rust binary if the template changes.
+
+Every generated artifact embeds the SHA256 hash of the specification it was produced from — creating a cryptographically verifiable link from certified specification to deployed artifact.
 
 ---
 
@@ -107,46 +45,35 @@ RPM · DEB · OCI via OBS"]
 
 ### Step 1 — Write a specification
 
-**Option A — AI-assisted interview *(recommended)***
+**Option A — AI-assisted interview *(recommended for new components)***
 
-Domain experts do not need to learn the specification format. Use
-`prompts/interview-prompt.md` with any capable LLM — including small models
-running locally without GPU acceleration.
-
-- **No existing material:** the model interviews the expert one question at a time
-- **Existing material** (email, meeting notes, design doc): paste it in — the model extracts what it can and asks only for what is missing
+No need to learn the spec format first. Use `prompts/interview-prompt.md` with any capable LLM — including small models running locally:
 
 ```bash
-# with a local model:
 ollama run llama3.2 "$(cat prompts/interview-prompt.md)"
 ```
 
+The model interviews you one question at a time and produces a complete spec.
+
 **Option B — Reverse-engineer existing code**
 
-Use `prompts/reverse-prompt.md` to produce a spec from an existing codebase.
-The model reads the source, detects the deployment type and language, confirms
-with you, and asks what you want to change. Useful for analysis, refactoring,
-or porting to a new language.
+Use `prompts/reverse-prompt.md` with any chat interface. The model reads your source code, produces a PCD spec, and asks what you want to change. Useful for porting, refactoring, or making PCD the new source of truth for an existing project.
 
-**Option C — Write the spec directly**
+**Option C — Write directly**
 
-See [`doc/guide.md`](doc/guide.md) for the full specification structure
-reference. Validate with:
+See [`doc/user-guide.md`](doc/user-guide.md) for the full specification structure reference.
+
+### Step 2 — Validate
 
 ```bash
 pcd-lint myspec.md
 ```
 
----
+Zero errors required before translating.
 
-### Step 2 — Translate to code
+### Step 3 — Translate to code
 
-Use the standard translator prompt from `prompts/prompt.md` with any capable LLM. The prompt instructs the LLM to:
-
-- Derive the target language from the deployment template — never declared in the spec
-- Produce all required deliverables from the template's DELIVERABLES section
-- Write a `TRANSLATION_REPORT.md` documenting every decision and confidence level
-- For large specs: check for an active milestone and translate only that milestone's BEHAVIORs
+Use `prompts/prompt.md` as the system prompt with any capable LLM. Provide the spec and the appropriate deployment template. The translator derives the target language from the template, produces all required deliverables, and writes a `TRANSLATION_REPORT.md`.
 
 ---
 
@@ -154,66 +81,31 @@ Use the standard translator prompt from `prompts/prompt.md` with any capable LLM
 
 ### pcd-lint
 
-`pcd-lint` — the validator in `tools/pcd-lint/` — was specified and generated using PCD itself. The specification in `tools/pcd-lint/spec/pcd-lint.md` describes what the tool must do. The implementation in `tools/pcd-lint/code/` was generated from that specification by an LLM, using `cli-tool.template.md` as the deployment template.
+The reference validator. Validates specification structure against 17 rules before any translation begins. Self-specified: `tools/pcd-lint/spec/pcd-lint.md` → generated Go binary.
 
-The LLM resolved Go as the target language from the template without being told. It produced the source code, RPM spec, Debian packaging, and a `TRANSLATION_REPORT.md` — all from the specification alone.
+```bash
+pcd-lint myspec.md              # validate
+pcd-lint strict=true myspec.md  # warnings become errors
+pcd-lint list-templates         # list known deployment templates
+```
 
 ### mcp-server-pcd
 
-`mcp-server-pcd` is an MCP server that makes the full PCD toolchain accessible to any MCP-capable LLM host (mcphost, Claude Desktop, VS Code, KIT, custom agents) — no local file copies of templates or prompts needed.
-
-**Tools** (callable by the LLM):
-
-| Tool | Description |
-|---|---|
-| `list_templates` | List all installed deployment templates |
-| `get_template` | Retrieve a template by name |
-| `list_resources` | List all available resources (templates, prompts, hints) |
-| `read_resource` | Read any resource by `pcd://` URI |
-| `lint_content` | Validate a spec given as a string — returns structured diagnostics |
-| `lint_file` | Validate a spec file on disk |
-| `get_schema_version` | Return the Spec-Schema version the server was built against |
-| `set_milestone_status` | Advance the milestone cursor in a spec file on disk |
-
-**Resources** (browseable by the LLM natively):
-
-| URI pattern | Content |
-|---|---|
-| `pcd://templates/{name}` | Full deployment template Markdown |
-| `pcd://prompts/interview` | The interview prompt — guides spec authoring |
-| `pcd://prompts/reverse` | The reverse prompt — reverse-engineers existing code |
-| `pcd://prompts/translator` | The universal translator prompt |
-| `pcd://hints/{template}.{lang}.{lib}` | Translator hints files |
-
-**Usage with mcphost:**
+An MCP server that makes the full PCD toolchain available to any MCP-capable LLM host — no local file copies of templates or prompts needed.
 
 ```yaml
+# mcphost config:
 mcpServers:
   pcd:
     command: mcp-server-pcd
     args: [stdio]
 ```
 
-A connected LLM can then conduct the full PCD workflow in a single session:
-read the interview prompt → interview the domain expert → write the spec →
-call `lint_content` → fix errors → read the template → translate to code →
-advance milestones via `set_milestone_status`.
+**Tools:** `list_templates`, `get_template`, `lint_content`, `lint_file`, `get_schema_version`, `set_milestone_status`, `assess_change_impact`, `verify_spec_hash`, `list_resources`
 
-`mcp-server-pcd` is itself specified in `tools/mcp-server-pcd/spec/mcp-server-pcd.md`
-and generated using PCD. Self-hosting all the way down.
+**Resources:** `pcd://templates/{name}`, `pcd://prompts/interview`, `pcd://prompts/translator`, `pcd://prompts/reverse`, `pcd://hints/{key}`
 
-### Empirical results
-
-Both tools were tested across multiple LLMs and model sizes — including small
-frontier models via direct API and a 120B open-weight model at a regional EU
-provider. Every model resolved Go as the target language from the deployment
-template without being told. All implementations passed their compile gates and
-test suites without hand-written code.
-
-A 35-BEHAVIOR, 2900-line specification (sitar — a Linux system information
-collector) was translated to both Go and Rust in single sessions each, using
-the scaffold-first milestone pattern. The scaffold held without modification
-through seven subsequent implementation milestones in both languages.
+Self-specified: `tools/mcp-server-pcd/spec/mcp-server-pcd.md` → generated Go binary.
 
 ---
 
@@ -222,54 +114,55 @@ through seven subsequent implementation milestones in both languages.
 ```
 pcd/
 ├── README.md
-├── LICENSE                            ← CC-BY-4.0 (specs, templates, whitepaper)
+├── LICENSE                            ← CC-BY-4.0 (specs, templates, docs)
 ├── LICENSE-tools                      ← GPL-2.0-only (tools/)
 ├── CONTRIBUTING.md                    ← for contributors to PCD itself
 │
 ├── doc/
-│   ├── guide.md                       ← user guide for spec authors  ← START HERE
-│   ├── whitepaper.md                  ← canonical whitepaper
-│   └── executive-brief.md             ← business / non-technical summary
+│   ├── user-guide.md                  ← how to use PCD  ← START HERE
+│   ├── technical-reference.md         ← design decisions and rationale
+│   ├── whitepaper.md                  ← paradigm, evidence, strategy
+│   └── executive-brief.md             ← business summary
 │
-├── hints/
-│   ├── cli-tool.go.milestones.hints.md
-│   ├── cli-tool.rs.milestones.hints.md
-│   ├── cloud-native.go.go-libvirt.hints.md
-│   ├── cloud-native.go.golang-crypto-ssh.hints.md
-│   ├── mcp-server.go.mcp-go.hints.md
-│   └── python-tool.hints.md
-│
-├── templates/
+├── hints/                             ← translator hints files
+├── templates/                         ← deployment templates
 │   ├── cli-tool.template.md
+│   ├── mcp-server.template.md
 │   ├── backend-service.template.md
 │   ├── cloud-native.template.md
 │   ├── gui-tool.template.md
-│   ├── mcp-server.template.md
-│   ├── verified-library.template.md
+│   ├── python-tool.template.md
 │   ├── library-c-abi.template.md
-│   ├── project-manifest.template.md
-│   └── python-tool.template.md
+│   ├── verified-library.template.md
+│   └── project-manifest.template.md
 │
-├── tools/
-│   ├── pcd-lint/                     ← GPL-2.0-only
-│   │   ├── spec/pcd-lint.md          ← specification
-│   │   └── code/                      ← generated implementation
-│   ├── mcp-server-pcd/               ← GPL-2.0-only
-│   │   ├── spec/mcp-server-pcd.md    ← specification
-│   │   └── code/                      ← generated implementation
-│   └── pcd-templates/                ← CC-BY-4.0
-│       ├── pcd-templates.spec        ← RPM spec
-│       └── debian/                    ← Debian packaging
+├── prompts/
+│   ├── prompt.md                      ← universal translator prompt
+│   ├── interview-prompt.md            ← spec authoring via guided interview
+│   ├── reverse-prompt.md              ← reverse-engineer existing code to spec
+│   └── change-impact.md              ← assess spec change impact
 │
 ├── examples/
-│   └── account-transfer.md
+│   ├── account-transfer/
+│   └── calc-interest/                 ← COBOL → PCD → Rust / Java demo
 │
-└── prompts/
-    ├── prompt.md                      ← standard translator prompt
-    ├── interview-prompt.md            ← AI-assisted spec authoring (new components)
-    ├── reverse-prompt.md              ← reverse-engineer existing code to spec
-    └── README-small-models.md
+└── tools/
+    ├── pcd-lint/                      ← GPL-2.0-only
+    │   ├── spec/pcd-lint.md
+    │   └── code/
+    ├── mcp-server-pcd/                ← GPL-2.0-only
+    │   ├── spec/mcp-server-pcd.md
+    │   └── code/
+    └── pcd-templates/                 ← CC-BY-4.0 (packaging)
 ```
+
+---
+
+## Empirical Validation
+
+The same specification produced working implementations in Go, Rust, and Java in independent translation runs — language chosen at translation time from the deployment template, not from the specification. A 35-BEHAVIOR, 2900-line specification (`sitar` — a Linux system information tool) was translated to both Go and Rust in single sessions each, using the scaffold-first milestone pattern. The scaffold held without modification through seven implementation milestones in both languages.
+
+Every LLM tested resolved the target language from the deployment template without being told explicitly. This has been validated across eight translation runs, three continents, and multiple model families including a 120B open-weight model at a regional EU provider.
 
 ---
 
@@ -277,25 +170,18 @@ pcd/
 
 | Artifact | License |
 |---|---|
-| Whitepaper, specifications, templates, guide | [CC-BY-4.0](LICENSE) |
-| `pcd-lint` and tools | [GPL-2.0-only](LICENSE-tools) |
+| Whitepaper, specifications, templates, docs | [CC-BY-4.0](LICENSE) |
+| `pcd-lint`, `mcp-server-pcd`, all tools | [GPL-2.0-only](LICENSE-tools) |
 
-The CC-BY-4.0 license on specifications and templates means anyone may implement the paradigm — including proprietary translators and commercial tools — provided attribution is given. The GPL-2.0-only license on `pcd-lint` ensures the reference validator remains community-controlled and open.
+CC-BY-4.0 on specifications and templates means anyone may implement the paradigm — including proprietary translators — provided attribution is given. GPL-2.0-only on tools keeps the reference validator community-controlled and vendor-neutral.
 
 ---
 
 ## Status
 
-Current version: **0.3.21** (draft)
+Current version: **0.3.22** (draft)
 
-This project is in active development. The specification format, deployment templates, and tooling are stabilising toward a v1.0 release. Feedback, issue reports, and contributions are welcome.
-
----
-
-![](doc/logo/pcd-logo-green.png)
+Active development. Specification format, deployment templates, and tooling are stabilising toward v1.0. Feedback and contributions welcome.
 
 ---
-
-## Author
-
-Matthias G. Eckermann — [pcd@mailbox.org](mailto:pcd@mailbox.org)
+**Author:** Matthias G. Eckermann — [pcd@mailbox.org](mailto:pcd@mailbox.org)
